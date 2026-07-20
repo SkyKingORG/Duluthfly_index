@@ -1,7 +1,14 @@
 @echo off
 cd /d "%~dp0"
 set "PROJECT_DIR=%~dp0"
-if not defined TWITCH_OAUTH set "TWITCH_OAUTH=gp762nuuoqcoxypju8c569th9wz7q5"
+if not defined TWITCH_OAUTH (
+  echo TWITCH_OAUTH is not set.
+  echo Set TWITCH_OAUTH in your terminal before running this script.
+  echo Example (PowerShell): $env:TWITCH_OAUTH = "oauth:your_token_here"
+  echo Example (cmd): set TWITCH_OAUTH=oauth:your_token_here
+  pause
+  exit /b 1
+)
 if defined TWITCH_OAUTH (
   set "TWITCH_OAUTH_PREFIX=%TWITCH_OAUTH:~0,6%"
   if /i not "%TWITCH_OAUTH_PREFIX%"=="oauth:" set "TWITCH_OAUTH=oauth:%TWITCH_OAUTH%"

@@ -108,6 +108,7 @@ Notes:
 - The bridge reuses the existing local bot HTTP endpoint so you do not need to change [zibo_failure_bot.lua](zibo_failure_bot.lua) to receive these Twitch event types.
 - `!startbot` is restricted to moderators/broadcaster and only works in `#desktoppilotsociety` by default.
 - Successful viewer-triggered Twitch actions send a chat acknowledgement so the channel can see that the event reached the bot.
+- `start_twitch_bridge.bat` does not contain a fallback OAuth token. Set `TWITCH_OAUTH` in your environment before launch.
 
 ### Windows environment example
 
