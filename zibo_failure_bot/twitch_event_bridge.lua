@@ -37,6 +37,15 @@ local function getenv_nonempty(name, fallback)
   return fallback
 end
 
+local function get_script_dir()
+  local src = debug.getinfo(1, "S").source
+  if type(src) == "string" and src:sub(1, 1) == "@" then
+    local path = src:sub(2)
+    return path:match("^(.*[\\/])") or ""
+  end
+  return ""
+end
+
 local config = {
   twitch = {
     nick = getenv_nonempty("TWITCH_BOT_NICK", "OnlyPilots"),
@@ -51,6 +60,9 @@ local config = {
     endpoint = getenv_nonempty("FAILURE_BOT_ENDPOINT", "/streamelements"),
   },
   synthetic_tip_command = getenv_nonempty("TWITCH_TIP_COMMAND", "!tip"),
+  start_bot_command = getenv_nonempty("TWITCH_STARTBOT_COMMAND", "!startbot"),
+  start_bot_channel = getenv_nonempty("TWITCH_STARTBOT_CHANNEL", "#desktoppilotsociety"):lower(),
+  start_bot_script = getenv_nonempty("TWITCH_STARTBOT_SCRIPT", "start_bot.bat"),
   reconnect_delay_seconds = tonumber(getenv_nonempty("TWITCH_RECONNECT_DELAY", "5")) or 5,
 }
 
@@ -266,6 +278,36 @@ local function forward_event(payload)
   end
 end
 
+local function can_start_bot(tags)
+  local mod_flag = tostring(tags.mod or "")
+  if mod_flag == "1" then
+    return true
+  end
+
+  local badges = tostring(tags.badges or "")
+  if badges:match("broadcaster/%d+") then
+    return true
+  end
+
+  return false
+end
+
+local function launch_local_bot()
+  local script_dir = get_script_dir()
+  local script_path = script_dir .. config.start_bot_script
+  local quoted_script = string.format('"%s"', script_path)
+  local launch_cmd = string.format('start "" /D "%s" cmd /c %s', script_dir:gsub('[\\/]$', ''), quoted_script)
+
+  local ok = os.execute(launch_cmd)
+  if ok == true or ok == 0 then
+    log("launched local bot using " .. config.start_bot_script)
+    return true
+  end
+
+  log("failed to launch local bot using " .. config.start_bot_script)
+  return false
+end
+
 local function handle_usernotice(tags)
   local msg_id = tostring(tags["msg-id"] or "")
   local user = user_from_tags(tags)
@@ -325,6 +367,23 @@ local function handle_privmsg(parsed)
   local tags = parsed.tags or {}
   local message = tostring(parsed.trailing or "")
   local user = user_from_tags(tags)
+  local channel = tostring(parsed.params and parsed.params[2] or ""):lower()
+
+  local normalized = trim(message):lower()
+  if normalized == config.start_bot_command:lower() then
+    if channel ~= config.start_bot_channel then
+      log("ignored !startbot outside allowed channel: " .. tostring(channel))
+      return
+    end
+
+    if not can_start_bot(tags) then
+      log("blocked !startbot from non-mod user: " .. tostring(user))
+      return
+    end
+
+    launch_local_bot()
+    return
+  end
 
   local bits = tonumber(tags.bits)
   if bits and bits > 0 then
