@@ -72,6 +72,7 @@ What it forwards into the bot:
 - synthetic tip events using a chat command.
 
 It can also launch the local bot process from Twitch chat with `!startbot`.
+When a viewer-triggered Twitch event is forwarded successfully, the bridge also posts a confirmation message back into Twitch chat.
 
 Environment variables used by the bridge:
 
@@ -88,6 +89,7 @@ Environment variables used by the bridge:
 - `TWITCH_STARTBOT_COMMAND` -> remote start command, defaults to `!startbot`
 - `TWITCH_STARTBOT_CHANNEL` -> only this channel may use the start command, defaults to `#desktoppilotsociety`
 - `TWITCH_STARTBOT_SCRIPT` -> local script name to launch, defaults to `start_bot.bat`
+- `TWITCH_CHAT_RESPONSES` -> set to `0` to disable Twitch chat confirmations, defaults to enabled
 
 Example run:
 
@@ -105,6 +107,7 @@ Notes:
 - Twitch IRC does not provide native donation / tip events. The bridge supports a synthetic tip command like `!tip 5` so chat automation can still trigger the bot's tip failure path.
 - The bridge reuses the existing local bot HTTP endpoint so you do not need to change [zibo_failure_bot.lua](zibo_failure_bot.lua) to receive these Twitch event types.
 - `!startbot` is restricted to moderators/broadcaster and only works in `#desktoppilotsociety` by default.
+- Successful viewer-triggered Twitch actions send a chat acknowledgement so the channel can see that the event reached the bot.
 
 ### Windows environment example
 

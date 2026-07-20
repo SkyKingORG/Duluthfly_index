@@ -63,6 +63,7 @@ local config = {
   start_bot_command = getenv_nonempty("TWITCH_STARTBOT_COMMAND", "!startbot"),
   start_bot_channel = getenv_nonempty("TWITCH_STARTBOT_CHANNEL", "#desktoppilotsociety"):lower(),
   start_bot_script = getenv_nonempty("TWITCH_STARTBOT_SCRIPT", "start_bot.bat"),
+  chat_responses_enabled = getenv_nonempty("TWITCH_CHAT_RESPONSES", "1") ~= "0",
   reconnect_delay_seconds = tonumber(getenv_nonempty("TWITCH_RECONNECT_DELAY", "5")) or 5,
 }
 
@@ -271,10 +272,67 @@ local function user_from_tags(tags)
   return trim(tags["display-name"] ~= "" and tags["display-name"] or tags.login or tags["user-login"] or tags.username or "unknown")
 end
 
-local function forward_event(payload)
+local function send_chat_message(client, message)
+  if not client or not config.chat_responses_enabled then
+    return false
+  end
+
+  local clean_message = trim(message):gsub("[\r\n]", " ")
+  if clean_message == "" then
+    return false
+  end
+
+  if #clean_message > 450 then
+    clean_message = clean_message:sub(1, 450)
+  end
+
+  local ok, send_err = client:send("PRIVMSG " .. config.twitch.channel .. " :" .. clean_message .. "\r\n")
+  if not ok then
+    log("failed to send Twitch chat response: " .. tostring(send_err))
+    return false
+  end
+
+  return true
+end
+
+local function build_chat_response(payload)
+  local event_type = tostring(payload.type or payload.event or "event")
+  local name = tostring(payload.name or payload.user or "viewer")
+
+  if event_type == "raid" then
+    return string.format("Raid triggered by %s with %d viewers. Failure event sent to the bot.", name, tonumber(payload.viewers) or 1)
+  end
+
+  if event_type == "subscription" then
+    local amount = tonumber(payload.amount) or 1
+    local kind = tostring(payload.subscription_kind or "sub")
+    return string.format("%s triggered a %s event (%d). Failure event sent to the bot.", name, kind, amount)
+  end
+
+  if event_type == "gifted" then
+    local amount = tonumber(payload.amount) or 1
+    if payload.recipient then
+      return string.format("%s gifted a sub to %s. Failure event sent to the bot.", name, tostring(payload.recipient))
+    end
+    return string.format("%s triggered %d gifted sub event(s). Failure event sent to the bot.", name, amount)
+  end
+
+  if event_type == "bits" then
+    return string.format("%s cheered %d bits. Failure event sent to the bot.", name, tonumber(payload.bits or payload.amount) or 0)
+  end
+
+  if event_type == "tip" then
+    return string.format("%s triggered a tip event of %s. Failure event sent to the bot.", name, tostring(payload.amount or 1))
+  end
+
+  return string.format("%s triggered %s. Failure event sent to the bot.", name, event_type)
+end
+
+local function forward_event(client, payload)
   local ok = post_to_bot(payload)
   if ok then
     log("forwarded " .. tostring(payload.type or payload.event or "event") .. " for " .. tostring(payload.name or payload.user or "unknown"))
+    send_chat_message(client, build_chat_response(payload))
   end
 end
 
@@ -308,12 +366,12 @@ local function launch_local_bot()
   return false
 end
 
-local function handle_usernotice(tags)
+local function handle_usernotice(client, tags)
   local msg_id = tostring(tags["msg-id"] or "")
   local user = user_from_tags(tags)
 
   if msg_id == "raid" then
-    forward_event({
+    forward_event(client, {
       type = "raid",
       event = "raid",
       viewers = tonumber(tags["msg-param-viewerCount"]) or 1,
@@ -325,7 +383,7 @@ local function handle_usernotice(tags)
 
   if msg_id == "sub" or msg_id == "resub" then
     local plan = tags["msg-param-sub-plan"] or "1000"
-    forward_event({
+    forward_event(client, {
       type = "subscription",
       event = "subscription",
       amount = tonumber(tags["msg-param-cumulative-months"]) or 1,
@@ -338,7 +396,7 @@ local function handle_usernotice(tags)
   end
 
   if msg_id == "subgift" or msg_id == "anonsubgift" then
-    forward_event({
+    forward_event(client, {
       type = "gifted",
       event = "gifted",
       amount = 1,
@@ -351,7 +409,7 @@ local function handle_usernotice(tags)
   end
 
   if msg_id == "submysterygift" or msg_id == "anonsubmysterygift" then
-    forward_event({
+    forward_event(client, {
       type = "gifted",
       event = "gifted",
       amount = tonumber(tags["msg-param-mass-gift-count"]) or 1,
@@ -363,7 +421,7 @@ local function handle_usernotice(tags)
   end
 end
 
-local function handle_privmsg(parsed)
+local function handle_privmsg(client, parsed)
   local tags = parsed.tags or {}
   local message = tostring(parsed.trailing or "")
   local user = user_from_tags(tags)
@@ -373,21 +431,28 @@ local function handle_privmsg(parsed)
   if normalized == config.start_bot_command:lower() then
     if channel ~= config.start_bot_channel then
       log("ignored !startbot outside allowed channel: " .. tostring(channel))
+      send_chat_message(client, "!startbot is only enabled in " .. config.start_bot_channel .. ".")
       return
     end
 
     if not can_start_bot(tags) then
       log("blocked !startbot from non-mod user: " .. tostring(user))
+      send_chat_message(client, user .. ", only the broadcaster or a moderator can use !startbot.")
       return
     end
 
-    launch_local_bot()
+    local launched = launch_local_bot()
+    if launched then
+      send_chat_message(client, "Bot start command accepted. Starting the local bot now.")
+    else
+      send_chat_message(client, "Bot start command failed on the local machine. Check the bridge logs.")
+    end
     return
   end
 
   local bits = tonumber(tags.bits)
   if bits and bits > 0 then
-    forward_event({
+    forward_event(client, {
       type = "bits",
       event = "bits",
       bits = bits,
@@ -403,7 +468,7 @@ local function handle_privmsg(parsed)
   local command_pattern = "^" .. config.synthetic_tip_command:gsub("([^%w])", "%%%1") .. "%s+(%d+%.?%d*)"
   local amount_text = message:match(command_pattern)
   if amount_text then
-    forward_event({
+    forward_event(client, {
       type = "tip",
       event = "tip",
       amount = tonumber(amount_text) or 1,
@@ -425,9 +490,9 @@ local function handle_line(client, line)
   end
 
   if parsed.command == "USERNOTICE" then
-    handle_usernotice(parsed.tags or {})
+    handle_usernotice(client, parsed.tags or {})
   elseif parsed.command == "PRIVMSG" then
-    handle_privmsg(parsed)
+    handle_privmsg(client, parsed)
   end
 end
 
