@@ -1,0 +1,5 @@
+# Runtime-generated state file - excluded from version control
+dashboard_state.json
+
+# LuaRocks local tree (install with: luarocks --tree luarocks-tree install <pkg>)
+luarocks-tree/

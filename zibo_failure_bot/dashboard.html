@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zibo Failure Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-top: #0a131d;
+      --bg-bottom: #02050a;
+      --panel: #111922;
+      --panel-edge: #2a3643;
+      --text: #e5edf6;
+      --muted: #8fa0b2;
+      --safe: #41d2ab;
+      --warn: #f0be56;
+      --danger: #ea6161;
+      --digit-bg: #071019;
+      --digit-edge: #28445c;
+      --digit-glow: #ff8b8b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Franklin Gothic Medium", "Trebuchet MS", Bahnschrift, sans-serif;
+      background:
+        radial-gradient(1200px 520px at 50% -220px, #203142 0%, rgba(32, 49, 66, 0) 72%),
+        linear-gradient(to bottom, var(--bg-top), var(--bg-bottom));
+      color: var(--text);
+      padding: 22px;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(1.3rem, 1.4vw + 0.8rem, 2rem);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .overall {
+      margin-bottom: 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .overall .title {
+      color: var(--muted);
+      font-size: 1.17rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .submeta {
+      margin-top: 8px;
+      font-size: 1.01rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a4b4c5;
+    }
+
+    .submeta strong {
+      color: #dce8f5;
+      margin-left: 6px;
+    }
+
+    .digital-value {
+      font-family: Consolas, "Lucida Console", "Courier New", monospace;
+      background: linear-gradient(180deg, #0a151f 0%, var(--digit-bg) 100%);
+      border: 1px solid var(--digit-edge);
+      border-radius: 10px;
+      padding: 8px 10px;
+      color: var(--digit-glow);
+      text-shadow: 0 0 12px rgba(255, 110, 110, 0.72);
+      letter-spacing: 0.06em;
+      display: inline-block;
+      min-width: 132px;
+      text-align: right;
+      font-weight: 700;
+      font-size: clamp(1.4rem, 1.5vw + 0.8rem, 2.2rem);
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        inset 0 0 24px rgba(255, 84, 84, 0.28),
+        inset 0 0 48px rgba(255, 34, 34, 0.16),
+        0 0 14px rgba(255, 71, 71, 0.2);
+    }
+
+    .digital-value::before,
+    .digital-value::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .digital-value::before {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(255, 90, 90, 0.08) 0,
+          rgba(255, 90, 90, 0.08) 1px,
+          transparent 1px,
+          transparent 4px
+        );
+      mix-blend-mode: screen;
+    }
+
+    .digital-value::after {
+      box-shadow: inset 0 0 36px rgba(255, 56, 56, 0.2);
+      border-radius: inherit;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--panel-edge);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 10px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    .system-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .system-name {
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-size: 1.17rem;
+      color: #c4d3e3;
+      font-weight: 700;
+    }
+
+    .status {
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .readout {
+      margin-bottom: 10px;
+      font-family: Consolas, "Lucida Console", "Courier New", monospace;
+      background: linear-gradient(180deg, #09131c 0%, #060d14 100%);
+      border: 1px solid #243f55;
+      border-radius: 9px;
+      padding: 6px 8px;
+      color: #ff8b8b;
+      text-shadow: 0 0 9px rgba(255, 120, 120, 0.72);
+      font-size: 1.55rem;
+      font-weight: 700;
+      text-align: right;
+      letter-spacing: 0.06em;
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        inset 0 0 18px rgba(255, 96, 96, 0.24),
+        inset 0 0 34px rgba(255, 46, 46, 0.14),
+        0 0 10px rgba(255, 72, 72, 0.16);
+    }
+
+    .readout::before,
+    .readout::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .readout::before {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 46%),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(255, 105, 105, 0.08) 0,
+          rgba(255, 105, 105, 0.08) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+      mix-blend-mode: screen;
+    }
+
+    .readout::after {
+      box-shadow: inset 0 0 24px rgba(255, 63, 63, 0.2);
+      border-radius: inherit;
+    }
+
+    .bar {
+      height: 12px;
+      background: #0a121a;
+      border: 1px solid #27384a;
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(
+          to right,
+          transparent 0,
+          transparent calc(10% - 1px),
+          rgba(255, 255, 255, 0.12) calc(10% - 1px),
+          rgba(255, 255, 255, 0.12) 10%
+        );
+    }
+
+    .fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--safe) 0%, #64f1c4 100%);
+      box-shadow: 0 0 10px rgba(65, 210, 171, 0.55);
+      transition: width 320ms ease-out, background 220ms linear, box-shadow 220ms linear;
+    }
+
+    .meta {
+      font-size: 1.12rem;
+      color: var(--muted);
+      margin-top: 8px;
+      min-height: 1.1em;
+    }
+
+    .status.ok { color: var(--safe); }
+    .status.caution { color: var(--warn); }
+    .status.danger { color: var(--danger); }
+
+    .readout.caution {
+      color: #ffd87d;
+      text-shadow: 0 0 9px rgba(240, 190, 86, 0.72);
+    }
+
+    .readout.danger {
+      color: #ff9d9d;
+      text-shadow: 0 0 10px rgba(234, 97, 97, 0.8);
+    }
+
+    .fill.caution {
+      background: linear-gradient(90deg, #d6a43f 0%, var(--warn) 100%);
+      box-shadow: 0 0 10px rgba(240, 190, 86, 0.62);
+    }
+
+    .fill.danger {
+      background: linear-gradient(90deg, #d04a4a 0%, var(--danger) 100%);
+      box-shadow: 0 0 10px rgba(234, 97, 97, 0.68);
+    }
+
+    .summary {
+      margin-top: 12px;
+      border-top: 1px solid #293746;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.12));
+    }
+
+    .signal-card {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .signal-card .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 0.92rem;
+      margin-bottom: 8px;
+    }
+
+    .signal-card .value {
+      font-family: Consolas, "Lucida Console", "Courier New", monospace;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--digit-glow);
+      text-shadow: 0 0 12px rgba(255, 110, 110, 0.72);
+      letter-spacing: 0.06em;
+    }
+
+    .signal-card .value.small {
+      font-size: 1.05rem;
+      color: #dce8f5;
+      text-shadow: none;
+      margin-top: 6px;
+    }
+
+    .signal-card .bits-total {
+      font-size: 1.9rem;
+      color: #ffd87d;
+    }
+
+    .ticker {
+      margin: 12px 0 2px;
+      border: 1px solid #294056;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #08131d, #040a11);
+      padding: 12px 14px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .ticker-track {
+      margin-left: 0;
+      white-space: nowrap;
+      display: inline-block;
+      min-width: 100%;
+      color: #ff9c9c;
+      text-shadow: 0 0 10px rgba(255, 110, 110, 0.6);
+      font-family: Consolas, "Lucida Console", "Courier New", monospace;
+      font-size: 1.42rem;
+      letter-spacing: 0.04em;
+      animation: tickerMove 16s linear infinite;
+      will-change: transform;
+    }
+
+    @keyframes tickerMove {
+      from { transform: translateX(100%); }
+      to { transform: translateX(-100%); }
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .overall {
+        grid-template-columns: 1fr;
+      }
+      .digital-value {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Zibo Failure Severity</h1>
+
+  <div class="card overall">
+    <div>
+      <div class="title">System Overview</div>
+      <div class="meta" id="overallMeta">Waiting for events...</div>
+      <div class="submeta">Days Since Last Failure:<strong id="daysSinceFailure">N/A</strong></div>
+    </div>
+    <div class="digital-value" id="overallValue">000%</div>
+  </div>
+
+  <div class="ticker" aria-live="polite">
+    <div class="ticker-track" id="raidTicker">No raids recorded yet.</div>
+  </div>
+
+  <div class="signal-card">
+    <div class="card">
+      <div class="label">Bits Given</div>
+      <div class="value" id="bitsAmount">0</div>
+      <div class="value small" id="bitsUser">By: None</div>
+    </div>
+    <div class="card">
+      <div class="label">Bits This Session</div>
+      <div class="value bits-total" id="bitsTotal">0</div>
+      <div class="value small" id="bitsMeta">No bits recorded yet.</div>
+    </div>
+    <div class="card">
+      <div class="label">Top Bits Giver</div>
+      <div class="value" id="topBitsAmount">0</div>
+      <div class="value small" id="topBitsUser">By: None</div>
+    </div>
+    <div class="card">
+      <div class="label">Highest Single Bits</div>
+      <div class="value" id="singleBitsAmount">0</div>
+      <div class="value small" id="singleBitsUser">By: None</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card" id="engineCard">
+      <div class="system-header">
+        <div class="system-name">Engine</div>
+        <div class="status" id="engineStatus">OK</div>
+      </div>
+      <div class="readout" id="engineValue">000%</div>
+      <div class="bar"><div class="fill" id="engineFill"></div></div>
+      <div class="meta" id="engineMeta">Idle</div>
+    </div>
+
+    <div class="card" id="hydraulicsCard">
+      <div class="system-header">
+        <div class="system-name">Hydraulics</div>
+        <div class="status" id="hydraulicsStatus">OK</div>
+      </div>
+      <div class="readout" id="hydraulicsValue">000%</div>
+      <div class="bar"><div class="fill" id="hydraulicsFill"></div></div>
+      <div class="meta" id="hydraulicsMeta">Idle</div>
+    </div>
+
+    <div class="card" id="avionicsCard">
+      <div class="system-header">
+        <div class="system-name">Avionics</div>
+        <div class="status" id="avionicsStatus">OK</div>
+      </div>
+      <div class="readout" id="avionicsValue">000%</div>
+      <div class="bar"><div class="fill" id="avionicsFill"></div></div>
+      <div class="meta" id="avionicsMeta">Idle</div>
+    </div>
+
+    <div class="card" id="electricalCard">
+      <div class="system-header">
+        <div class="system-name">Electrical</div>
+        <div class="status" id="electricalStatus">OK</div>
+      </div>
+      <div class="readout" id="electricalValue">000%</div>
+      <div class="bar"><div class="fill" id="electricalFill"></div></div>
+      <div class="meta" id="electricalMeta">Idle</div>
+    </div>
+
+    <div class="card" id="airframeCard">
+      <div class="system-header">
+        <div class="system-name">Airframe</div>
+        <div class="status" id="airframeStatus">OK</div>
+      </div>
+      <div class="readout" id="airframeValue">000%</div>
+      <div class="bar"><div class="fill" id="airframeFill"></div></div>
+      <div class="meta" id="airframeMeta">Idle</div>
+    </div>
+  </div>
+
+  <div class="card summary">
+    <div id="summaryText">No failures active yet.</div>
+  </div>
+
+  <script>
+    const tuning = {
+      engine: { cautionFrom: 45, dangerFrom: 70 },
+      hydraulics: { cautionFrom: 55, dangerFrom: 82 },
+      avionics: { cautionFrom: 42, dangerFrom: 68 },
+      electrical: { cautionFrom: 50, dangerFrom: 76 },
+      airframe: { cautionFrom: 60, dangerFrom: 86 }
+    };
+
+    function toStatus(value, thresholds) {
+      if (value >= thresholds.dangerFrom) return 'danger';
+      if (value >= thresholds.cautionFrom) return 'caution';
+      return 'ok';
+    }
+
+    function formatPercent(value) {
+      return String(value).padStart(3, '0') + '%';
+    }
+
+    function formatDaysSince(lastFailureTs) {
+      if (!Number.isFinite(lastFailureTs) || lastFailureTs <= 0) {
+        return 'N/A';
+      }
+
+      const elapsedMs = Date.now() - (lastFailureTs * 1000);
+      const days = Math.max(0, Math.floor(elapsedMs / 86400000));
+      return String(days);
+    }
+
+    function formatRaidTicker(lastRaid) {
+      if (!lastRaid || !lastRaid.user || !Number.isFinite(lastRaid.viewers) || lastRaid.viewers <= 0) {
+        return 'No raids recorded yet.';
+      }
+
+      return `${lastRaid.user} raided with ${Math.round(lastRaid.viewers)} viewers`;
+    }
+
+    function formatBitsMeta(lastBits) {
+      if (!lastBits || !lastBits.user || !Number.isFinite(lastBits.amount) || lastBits.amount <= 0) {
+        return 'No bits recorded yet.';
+      }
+
+      return `${lastBits.user} gave ${Math.round(lastBits.amount)} bits`;
+    }
+
+    function formatBitsTicker(data) {
+      const bitsData = data.last_bits || null;
+      const totalBits = Number(data.total_bits);
+      const topBitsData = data.top_bits_giver || null;
+      const singleBitsData = data.highest_single_bits || null;
+
+      const lastBitsText = bitsData && bitsData.user && Number.isFinite(Number(bitsData.amount)) && Number(bitsData.amount) > 0
+        ? `${bitsData.user} gave ${Math.round(Number(bitsData.amount))} bits`
+        : 'No bits recorded yet';
+
+      const totalBitsText = Number.isFinite(totalBits) && totalBits > 0
+        ? `${Math.round(totalBits)} total bits this session`
+        : '0 total bits this session';
+
+      const topBitsText = topBitsData && topBitsData.user && Number.isFinite(Number(topBitsData.amount)) && Number(topBitsData.amount) > 0
+        ? `Top giver: ${topBitsData.user} with ${Math.round(Number(topBitsData.amount))} bits`
+        : 'Top giver: none yet';
+
+      const singleBitsText = singleBitsData && singleBitsData.user && Number.isFinite(Number(singleBitsData.amount)) && Number(singleBitsData.amount) > 0
+        ? `Highest single bits: ${singleBitsData.user} with ${Math.round(Number(singleBitsData.amount))} bits`
+        : 'Highest single bits: none yet';
+
+      return `${lastBitsText} • ${totalBitsText} • ${topBitsText} • ${singleBitsText}`;
+    }
+
+    function buildTickerMessages(data) {
+      const raidData = data.last_raid || null;
+      const bitsData = data.last_bits || null;
+      const totalBits = Number(data.total_bits);
+      const topBitsData = data.top_bits_giver || null;
+      const singleBitsData = data.highest_single_bits || null;
+
+      const messages = [];
+
+      if (raidData && raidData.user && Number.isFinite(Number(raidData.viewers)) && Number(raidData.viewers) > 0) {
+        messages.push(`${raidData.user} raided with ${Math.round(Number(raidData.viewers))} viewers`);
+      } else {
+        messages.push('No raids recorded yet');
+      }
+
+      if (bitsData && bitsData.user && Number.isFinite(Number(bitsData.amount)) && Number(bitsData.amount) > 0) {
+        messages.push(`${bitsData.user} gave ${Math.round(Number(bitsData.amount))} bits`);
+      } else {
+        messages.push('No bits recorded yet');
+      }
+
+      if (Number.isFinite(totalBits) && totalBits > 0) {
+        messages.push(`${Math.round(totalBits)} total bits this session`);
+      }
+
+      if (topBitsData && topBitsData.user && Number.isFinite(Number(topBitsData.amount)) && Number(topBitsData.amount) > 0) {
+        messages.push(`Top giver: ${topBitsData.user} with ${Math.round(Number(topBitsData.amount))} bits`);
+      }
+
+      if (singleBitsData && singleBitsData.user && Number.isFinite(Number(singleBitsData.amount)) && Number(singleBitsData.amount) > 0) {
+        messages.push(`Highest single bits: ${singleBitsData.user} with ${Math.round(Number(singleBitsData.amount))} bits`);
+      }
+
+      const bitsSummary = formatBitsTicker(data);
+      if (bitsSummary) {
+        messages.push(bitsSummary);
+      }
+
+      return messages;
+    }
+
+    function rotateTicker(messages) {
+      const ticker = document.getElementById('raidTicker');
+      if (!ticker) return;
+
+      const items = Array.isArray(messages) ? messages.filter(Boolean) : [];
+      if (items.length === 0) {
+        ticker.textContent = 'No events recorded yet.';
+        return;
+      }
+
+      let index = 0;
+      ticker.textContent = items[0];
+
+      if (ticker._timerId) {
+        clearInterval(ticker._timerId);
+      }
+
+      ticker._timerId = setInterval(() => {
+        index = (index + 1) % items.length;
+        ticker.textContent = items[index];
+      }, 4500);
+    }
+
+    function updateSystem(name, value, metaText) {
+      const status = toStatus(value, tuning[name]);
+
+      const valueEl = document.getElementById(name + 'Value');
+      const statusEl = document.getElementById(name + 'Status');
+      const fillEl = document.getElementById(name + 'Fill');
+      const metaEl = document.getElementById(name + 'Meta');
+
+      valueEl.textContent = formatPercent(value);
+      valueEl.className = 'readout ' + (status === 'ok' ? '' : status);
+
+      statusEl.textContent = status === 'ok' ? 'Normal' : (status === 'caution' ? 'Caution' : 'Warning');
+      statusEl.className = 'status ' + status;
+
+      fillEl.style.width = value + '%';
+      fillEl.className = 'fill ' + (status === 'ok' ? '' : status);
+
+      metaEl.textContent = metaText || 'Idle';
+    }
+
+    async function refresh() {
+      try {
+        const response = await fetch('./dashboard_state.json', { cache: 'no-store' });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const severity = Math.max(0, Math.min(100, Math.round(data.severity * 100)));
+
+        document.getElementById('overallValue').textContent = formatPercent(severity);
+        document.getElementById('overallMeta').textContent = data.last_event + ' • ' + data.event_counter + ' events';
+        document.getElementById('daysSinceFailure').textContent = formatDaysSince(Number(data.last_failure_ts));
+
+        const raidData = data.last_raid || null;
+        rotateTicker(buildTickerMessages({
+          ...data,
+          last_raid: raidData,
+          last_bits: data.last_bits || null,
+          top_bits_giver: data.top_bits_giver || null,
+          highest_single_bits: data.highest_single_bits || null
+        }));
+
+        const bitsData = data.last_bits || null;
+        const bitsAmount = Number(bitsData && bitsData.amount);
+        document.getElementById('bitsAmount').textContent = Number.isFinite(bitsAmount) && bitsAmount > 0 ? String(Math.round(bitsAmount)) : '0';
+        document.getElementById('bitsUser').textContent = 'By: ' + ((bitsData && bitsData.user) ? String(bitsData.user) : 'None');
+        const totalBits = Number(data.total_bits);
+        document.getElementById('bitsTotal').textContent = Number.isFinite(totalBits) && totalBits > 0 ? String(Math.round(totalBits)) : '0';
+        document.getElementById('bitsMeta').textContent = formatBitsMeta({
+          user: bitsData && bitsData.user ? String(bitsData.user) : '',
+          amount: bitsAmount
+        });
+
+        const topBitsData = data.top_bits_giver || null;
+        const topBitsAmount = Number(topBitsData && topBitsData.amount);
+        document.getElementById('topBitsAmount').textContent = Number.isFinite(topBitsAmount) && topBitsAmount > 0 ? String(Math.round(topBitsAmount)) : '0';
+        document.getElementById('topBitsUser').textContent = 'By: ' + ((topBitsData && topBitsData.user) ? String(topBitsData.user) : 'None');
+
+        const singleBitsData = data.highest_single_bits || null;
+        const singleBitsAmount = Number(singleBitsData && singleBitsData.amount);
+        document.getElementById('singleBitsAmount').textContent = Number.isFinite(singleBitsAmount) && singleBitsAmount > 0 ? String(Math.round(singleBitsAmount)) : '0';
+        document.getElementById('singleBitsUser').textContent = 'By: ' + ((singleBitsData && singleBitsData.user) ? String(singleBitsData.user) : 'None');
+
+        const failures = data.failures || {};
+        const names = ['engine', 'hydraulics', 'avionics', 'electrical', 'airframe'];
+
+        names.forEach((name) => {
+          const value = failures[name] ? Math.round((failures[name].severity || 0) * 100) : 0;
+          const meta = failures[name]
+            ? ((failures[name].details && failures[name].details.user) ? failures[name].details.user : 'Active')
+            : 'Idle';
+
+          updateSystem(name, value, meta);
+        });
+
+        const active = Object.entries(failures).map(([k, v]) => `${k}: ${Math.round((v.severity || 0) * 100)}%`).join(' • ');
+        document.getElementById('summaryText').textContent = active || 'No failures active yet.';
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>
