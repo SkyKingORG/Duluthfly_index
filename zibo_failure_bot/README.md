@@ -36,6 +36,27 @@ This package creates a lightweight Lua-based bot that can:
 5. Start the script with `start_bot.bat`.
 6. Open [dashboard.html](dashboard.html) in a browser.
 
+## Automatic install into X-Plane folders
+
+Use the installer to automatically place files into the simulator tree:
+
+- Host-side bot files are copied to `X-Plane 12\\Tools\\ZiboFailureBot`.
+- The FlyWithLua bridge is copied to `X-Plane 12\\Resources\\plugins\\FlyWithLua\\Scripts\\zibo_failure_xplane_bridge.lua`.
+
+PowerShell:
+
+- `./install_bot.ps1 -SimulatorRoot "D:\\X-Plane 12"`
+
+Command Prompt:
+
+- `install_bot.bat "D:\\X-Plane 12"`
+
+Optional preview (no file changes):
+
+- `./install_bot.ps1 -SimulatorRoot "D:\\X-Plane 12" -DryRun`
+
+After install, launch the bot from `Tools\\ZiboFailureBot\\start_bot.bat` and launch Twitch relay from `Tools\\ZiboFailureBot\\start_twitch_bridge.bat`.
+
 ## Twitch event bridge
 
 Use [twitch_event_bridge.lua](twitch_event_bridge.lua) when you want Twitch-native IRC events to trigger failures in the standalone bot.
