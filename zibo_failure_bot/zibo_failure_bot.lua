@@ -469,6 +469,10 @@ local state = {
     viewers = 0,
     ts = 0,
   },
+  last_follower = {
+    user = "None",
+    ts = 0,
+  },
   last_bits = {
     user = "None",
     amount = 0,
@@ -531,6 +535,7 @@ local function write_dashboard_state()
     failures = state.active_failures,
     last_failure_ts = state.last_failure_ts,
     last_raid = state.last_raid,
+    last_follower = state.last_follower,
     last_bits = state.last_bits,
     total_bits = state.total_bits,
     top_bits_giver = state.top_bits_giver,
@@ -650,28 +655,62 @@ local function parse_payload(body)
   return nil
 end
 
+local function payload_user(payload)
+  if type(payload) ~= "table" then
+    return "unknown"
+  end
+
+  local data = payload.data
+  local user = payload.user or payload.name or payload.username or (type(data) == "table" and data.name)
+  if user and user ~= "" then
+    return user
+  end
+
+  return "unknown"
+end
+
+local function record_follower(user_name)
+  local follower_user = "unknown"
+  if user_name and user_name ~= "" then
+    follower_user = user_name
+  end
+
+  state.last_follower = {
+    user = follower_user,
+    ts = os.time(),
+  }
+
+  write_dashboard_state()
+  print(string.format("[event] follower -> user=%s", follower_user))
+end
+
 local function handle_streamlabs_payload(payload)
   if not payload then return end
   local event_name = nil
   local amount = 1
   local details = {}
 
+  if payload.type == "follow" or payload.type == "follower" or payload.event == "follow" or payload.event == "follower" then
+    record_follower(payload_user(payload))
+    return
+  end
+
   if payload.type == "donation" or payload.type == "tip" or payload.event == "donation" then
     event_name = "tip"
     amount = coerce_number(payload.amount or payload.amount_value or payload.data and payload.data.amount or 1, 1)
-    details = { source = "streamlabs", user = payload.user or payload.name or payload.username or "unknown" }
+    details = { source = "streamlabs", user = payload_user(payload) }
   elseif payload.type == "subscription" or payload.event == "subscription" then
     event_name = "subscribe"
     amount = coerce_number(payload.amount or payload.months or 1, 1)
-    details = { source = "streamlabs", user = payload.user or payload.name or payload.username or "unknown" }
+    details = { source = "streamlabs", user = payload_user(payload) }
   elseif payload.type == "raid" or payload.event == "raid" then
     event_name = "raid"
     amount = coerce_number(payload.viewers or payload.viewer_count or 1, 1)
-    details = { source = "streamlabs", user = payload.user or payload.name or payload.username or "unknown" }
+    details = { source = "streamlabs", user = payload_user(payload) }
   elseif payload.type == "bits" or payload.event == "bits" then
     event_name = "bits"
     amount = coerce_number(payload.bits or payload.amount or 1, 1)
-    details = { source = "streamlabs", user = payload.user or payload.name or payload.username or "unknown" }
+    details = { source = "streamlabs", user = payload_user(payload) }
   end
 
   if event_name then apply_event(event_name, amount, details) end
@@ -683,26 +722,31 @@ local function handle_streamelements_payload(payload)
   local amount = 1
   local details = {}
 
+  if payload.type == "follow" or payload.type == "follower" or payload.event == "follow" or payload.event == "follower" or payload.action == "follow" then
+    record_follower(payload_user(payload))
+    return
+  end
+
   if payload.type == "tip" or payload.event == "tip" or payload.action == "tip" then
     event_name = "tip"
     amount = coerce_number(payload.amount or payload.data and payload.data.amount or 1, 1)
-    details = { source = "streamelements", user = payload.name or payload.username or payload.user or "unknown" }
+    details = { source = "streamelements", user = payload_user(payload) }
   elseif payload.type == "subscriber" or payload.type == "subscription" or payload.event == "subscription" then
     event_name = "subscribe"
     amount = coerce_number(payload.amount or payload.months or 1, 1)
-    details = { source = "streamelements", user = payload.name or payload.username or payload.user or "unknown" }
+    details = { source = "streamelements", user = payload_user(payload) }
   elseif payload.type == "raid" or payload.event == "raid" then
     event_name = "raid"
     amount = coerce_number(payload.viewers or payload.viewer_count or 1, 1)
-    details = { source = "streamelements", user = payload.name or payload.username or payload.user or "unknown" }
+    details = { source = "streamelements", user = payload_user(payload) }
   elseif payload.type == "gifted" or payload.event == "gifted" or payload.type == "gift_sub" then
     event_name = "gift"
     amount = coerce_number(payload.amount or payload.count or payload.gifts or 1, 1)
-    details = { source = "streamelements", user = payload.name or payload.username or payload.user or "unknown" }
+    details = { source = "streamelements", user = payload_user(payload) }
   elseif payload.type == "bits" or payload.event == "bits" then
     event_name = "bits"
     amount = coerce_number(payload.bits or payload.amount or 1, 1)
-    details = { source = "streamelements", user = payload.name or payload.username or payload.user or "unknown" }
+    details = { source = "streamelements", user = payload_user(payload) }
   end
 
   if event_name then apply_event(event_name, amount, details) end

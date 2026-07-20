@@ -481,6 +481,14 @@
       return `${lastRaid.user} raided with ${Math.round(lastRaid.viewers)} viewers`;
     }
 
+    function formatFollowerTicker(lastFollower) {
+      if (!lastFollower || !lastFollower.user || lastFollower.user === 'None' || lastFollower.user === 'unknown') {
+        return 'No followers recorded yet';
+      }
+
+      return `Recent follower: ${lastFollower.user}`;
+    }
+
     function formatBitsMeta(lastBits) {
       if (!lastBits || !lastBits.user || !Number.isFinite(lastBits.amount) || lastBits.amount <= 0) {
         return 'No bits recorded yet.';
@@ -489,33 +497,9 @@
       return `${lastBits.user} gave ${Math.round(lastBits.amount)} bits`;
     }
 
-    function formatBitsTicker(data) {
-      const bitsData = data.last_bits || null;
-      const totalBits = Number(data.total_bits);
-      const topBitsData = data.top_bits_giver || null;
-      const singleBitsData = data.highest_single_bits || null;
-
-      const lastBitsText = bitsData && bitsData.user && Number.isFinite(Number(bitsData.amount)) && Number(bitsData.amount) > 0
-        ? `${bitsData.user} gave ${Math.round(Number(bitsData.amount))} bits`
-        : 'No bits recorded yet';
-
-      const totalBitsText = Number.isFinite(totalBits) && totalBits > 0
-        ? `${Math.round(totalBits)} total bits this session`
-        : '0 total bits this session';
-
-      const topBitsText = topBitsData && topBitsData.user && Number.isFinite(Number(topBitsData.amount)) && Number(topBitsData.amount) > 0
-        ? `Top giver: ${topBitsData.user} with ${Math.round(Number(topBitsData.amount))} bits`
-        : 'Top giver: none yet';
-
-      const singleBitsText = singleBitsData && singleBitsData.user && Number.isFinite(Number(singleBitsData.amount)) && Number(singleBitsData.amount) > 0
-        ? `Highest single bits: ${singleBitsData.user} with ${Math.round(Number(singleBitsData.amount))} bits`
-        : 'Highest single bits: none yet';
-
-      return `${lastBitsText} • ${totalBitsText} • ${topBitsText} • ${singleBitsText}`;
-    }
-
     function buildTickerMessages(data) {
       const raidData = data.last_raid || null;
+      const followerData = data.last_follower || null;
       const bitsData = data.last_bits || null;
       const totalBits = Number(data.total_bits);
       const topBitsData = data.top_bits_giver || null;
@@ -523,11 +507,14 @@
 
       const messages = [];
 
-      if (raidData && raidData.user && Number.isFinite(Number(raidData.viewers)) && Number(raidData.viewers) > 0) {
-        messages.push(`${raidData.user} raided with ${Math.round(Number(raidData.viewers))} viewers`);
-      } else {
-        messages.push('No raids recorded yet');
-      }
+      messages.push(formatRaidTicker({
+        user: raidData && raidData.user ? String(raidData.user) : '',
+        viewers: Number(raidData && raidData.viewers)
+      }));
+
+      messages.push(formatFollowerTicker({
+        user: followerData && followerData.user ? String(followerData.user) : ''
+      }));
 
       if (bitsData && bitsData.user && Number.isFinite(Number(bitsData.amount)) && Number(bitsData.amount) > 0) {
         messages.push(`${bitsData.user} gave ${Math.round(Number(bitsData.amount))} bits`);
@@ -545,11 +532,6 @@
 
       if (singleBitsData && singleBitsData.user && Number.isFinite(Number(singleBitsData.amount)) && Number(singleBitsData.amount) > 0) {
         messages.push(`Highest single bits: ${singleBitsData.user} with ${Math.round(Number(singleBitsData.amount))} bits`);
-      }
-
-      const bitsSummary = formatBitsTicker(data);
-      if (bitsSummary) {
-        messages.push(bitsSummary);
       }
 
       return messages;
