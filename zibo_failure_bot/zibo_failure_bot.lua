@@ -394,6 +394,19 @@ local function getenv_nonempty(name, fallback)
   return fallback
 end
 
+local function show_status_message(title, message, is_error)
+  local safe_title = tostring(title or "Bot Status"):gsub("'", "''")
+  local safe_message = tostring(message or ""):gsub("'", "''")
+  local icon = is_error and "Error" or "Information"
+  local command = table.concat({
+    "powershell -NoProfile -ExecutionPolicy Bypass -Command",
+    '"Add-Type -AssemblyName PresentationFramework;',
+    string.format("[System.Windows.MessageBox]::Show('%s','%s','OK','%s') | Out-Null", safe_message, safe_title, icon),
+    '"',
+  }, " ")
+  pcall(os.execute, command)
+end
+
 local config = {
   listen_port = 6100,
   xplane_host = "127.0.0.1",
@@ -820,6 +833,7 @@ local function main()
   -- In FlyWithLua, use xplane_bridge.lua and keep this script external.
   if type(do_every_frame) == "function" then
     print("[bot] zibo_failure_bot.lua is standalone. Run it outside FlyWithLua; use xplane_bridge.lua in-sim.")
+    show_status_message("Bot Not Started", "zibo_failure_bot.lua is standalone. Run it outside FlyWithLua; use xplane_bridge.lua in-sim.", true)
     return
   end
 
@@ -827,6 +841,7 @@ local function main()
     print("[bot] disabled: missing runtime module(s)")
     print("[bot] socket: " .. tostring(socket_err or "ok"))
     print("[bot] dkjson: " .. tostring(json_err or "ok"))
+    show_status_message("Bot Not Started", "Missing required Lua runtime modules. Install LuaSocket and dkjson.", true)
     return
   end
 
@@ -839,11 +854,14 @@ local function main()
 
   local server, server_err = create_http_server("*", config.listen_port)
   if not server then
+    local message = "Could not start HTTP listener on port " .. tostring(config.listen_port) .. ": " .. tostring(server_err)
+    show_status_message("Bot Not Started", message, true)
     error(server_err)
   end
   server:settimeout(0.1)
   print(string.format("[http] listening on port %d", config.listen_port))
   print("[bot] ready. Send events to /streamlabs or /streamelements, or use Twitch chat commands if enabled.")
+  show_status_message("Bot Started", "Zibo Failure Bot started and is listening on port " .. tostring(config.listen_port) .. ".", false)
 
   while true do
     local ready_list = {}
