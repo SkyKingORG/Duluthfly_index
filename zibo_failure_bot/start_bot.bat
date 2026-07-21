@@ -65,4 +65,16 @@ if /i "%LUA_CMD%"=="lua" (
   )
 )
 
+set "TWITCH_OAUTH=oauth:ambcwmt03vrl239ls7hxifcywfh90w"
+set "TWITCH_BOT_NICK=OnlyPilots"
+set "TWITCH_CHANNEL=#desktoppilotsociety"
+
+rem -- Always enable Twitch IRC and StreamElements/Streamlabs integrations --
+set "TWITCH_ENABLED=true"
+set "STREAMELEMENTS_ENABLED=true"
+set "STREAMLABS_ENABLED=true"
+
+rem -- Launch event relay (SE + Twitch) in a separate window --
+start "event_relay" powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%event_relay.ps1"
+
 "%LUA_CMD%" zibo_failure_bot.lua

@@ -163,7 +163,6 @@ end
 local function parse_irc_line(line)
   local cursor = 1
   local tags = {}
-  local prefix = nil
 
   if line:sub(cursor, cursor) == "@" then
     local space_pos = line:find(" ", cursor, true)
@@ -179,7 +178,6 @@ local function parse_irc_line(line)
     if not space_pos then
       return nil
     end
-    prefix = line:sub(cursor + 1, space_pos - 1)
     cursor = space_pos + 1
   end
 
@@ -198,7 +196,6 @@ local function parse_irc_line(line)
 
   return {
     tags = tags,
-    prefix = prefix,
     command = parts[1],
     params = parts,
     trailing = trailing,

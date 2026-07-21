@@ -413,7 +413,7 @@ local config = {
   xplane_port = 49000,
   dashboard_path = "dashboard_state.json",
   twitch = {
-    enabled = true,
+    enabled = getenv_nonempty("TWITCH_ENABLED", "true") ~= "false",
     nick = getenv_nonempty("TWITCH_BOT_NICK", "OnlyPilots"),
     oauth = getenv_nonempty("TWITCH_OAUTH", "oauth:replace_with_token"),
     channel = getenv_nonempty("TWITCH_CHANNEL", "#desktoppilotsociety"),
@@ -421,11 +421,11 @@ local config = {
     port = tonumber(getenv_nonempty("TWITCH_IRC_PORT", "6667")) or 6667,
   },
   streamelements = {
-    enabled = true,
+    enabled = getenv_nonempty("STREAMELEMENTS_ENABLED", "true") ~= "false",
     endpoint = "/streamelements",
   },
   streamlabs = {
-    enabled = true,
+    enabled = getenv_nonempty("STREAMLABS_ENABLED", "true") ~= "false",
     endpoint = "/streamlabs",
   },
   weights = {
@@ -434,7 +434,6 @@ local config = {
     tip = 0.16,
     gift = 0.14,
     bits = 0.10,
-    cheer = 0.09,
     command = 0.08,
   },
   failure_profile = {
@@ -446,15 +445,6 @@ local config = {
   },
   zibo = {
     enabled = true,
-    -- Replace these with the exact datarefs/commands you want to use in your
-    -- X-Plane 12 setup or FlyWithLua script. The defaults below are examples.
-    mapping = {
-      engine = { dataref = "sim/operation/failures/rel_engfir1", mode = "set" },
-      hydraulics = { dataref = "sim/operation/failures/rel_hyd1", mode = "set" },
-      avionics = { dataref = "sim/operation/failures/rel_avionics", mode = "set" },
-      electrical = { dataref = "sim/operation/failures/rel_elec", mode = "set" },
-      airframe = { dataref = "sim/operation/failures/rel_structure", mode = "set" },
-    }
   }
 }
 
@@ -878,14 +868,6 @@ local function main()
   if type(do_every_frame) == "function" then
     print("[bot] zibo_failure_bot.lua is standalone. Run it outside FlyWithLua; use xplane_bridge.lua in-sim.")
     show_status_message("Bot Not Started", "zibo_failure_bot.lua is standalone. Run it outside FlyWithLua; use xplane_bridge.lua in-sim.", true)
-    return
-  end
-
-  if not socket or not json then
-    print("[bot] disabled: missing runtime module(s)")
-    print("[bot] socket: " .. tostring(socket_err or "ok"))
-    print("[bot] dkjson: " .. tostring(json_err or "ok"))
-    show_status_message("Bot Not Started", "Missing required Lua runtime modules. Install LuaSocket and dkjson.", true)
     return
   end
 
