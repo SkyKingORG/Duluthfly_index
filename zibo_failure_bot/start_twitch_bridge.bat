@@ -4,8 +4,8 @@ set "PROJECT_DIR=%~dp0"
 if not defined TWITCH_OAUTH (
   echo TWITCH_OAUTH is not set.
   echo Set TWITCH_OAUTH in your terminal before running this script.
-  echo Example (PowerShell): $env:TWITCH_OAUTH = "oauth:your_token_here"
-  echo Example (cmd): set TWITCH_OAUTH=oauth:your_token_here
+  echo Example ^(PowerShell^): $env:TWITCH_OAUTH = "oauth:your_token_here"
+  echo Example ^(cmd^): set TWITCH_OAUTH=oauth:your_token_here
   pause
   exit /b 1
 )
