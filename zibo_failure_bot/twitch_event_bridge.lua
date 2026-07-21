@@ -62,7 +62,7 @@ local config = {
   synthetic_tip_command = getenv_nonempty("TWITCH_TIP_COMMAND", "!tip"),
   start_bot_command = getenv_nonempty("TWITCH_STARTBOT_COMMAND", "!startbot"),
   start_bot_channel = getenv_nonempty("TWITCH_STARTBOT_CHANNEL", "#desktoppilotsociety"):lower(),
-  start_bot_script = getenv_nonempty("TWITCH_STARTBOT_SCRIPT", "start_bot.bat"),
+  start_bot_script = getenv_nonempty("TWITCH_STARTBOT_SCRIPT", "start_all_bats.bat"),
   chat_responses_enabled = getenv_nonempty("TWITCH_CHAT_RESPONSES", "1") ~= "0",
   reconnect_delay_seconds = tonumber(getenv_nonempty("TWITCH_RECONNECT_DELAY", "5")) or 5,
 }

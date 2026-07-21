@@ -65,16 +65,33 @@ if /i "%LUA_CMD%"=="lua" (
   )
 )
 
-set "TWITCH_OAUTH=oauth:ambcwmt03vrl239ls7hxifcywfh90w"
-set "TWITCH_BOT_NICK=OnlyPilots"
-set "TWITCH_CHANNEL=#desktoppilotsociety"
+if not defined TWITCH_BOT_NICK set "TWITCH_BOT_NICK=OnlyPilots"
+if not defined TWITCH_CHANNEL set "TWITCH_CHANNEL=#desktoppilotsociety"
+if not defined TWITCH_OAUTH set "TWITCH_OAUTH=oauth:wyhoegqqw5bfqh8590x6hhhrnnf86r"
 
-rem -- Always enable Twitch IRC and StreamElements/Streamlabs integrations --
-set "TWITCH_ENABLED=true"
+if not defined TWITCH_OAUTH (
+  echo TWITCH_OAUTH is not set. Starting bot with Twitch IRC disabled.
+  set "TWITCH_ENABLED=false"
+) else (
+  set "TWITCH_OAUTH_PREFIX=%TWITCH_OAUTH:~0,6%"
+  if /i not "%TWITCH_OAUTH_PREFIX%"=="oauth:" set "TWITCH_OAUTH=oauth:%TWITCH_OAUTH%"
+  set "TWITCH_OAUTH_PREFIX="
+  set "TWITCH_ENABLED=true"
+)
+
+rem -- Keep webhook integrations enabled by default --
 set "STREAMELEMENTS_ENABLED=true"
 set "STREAMLABS_ENABLED=true"
 
-rem -- Launch event relay (SE + Twitch) in a separate window --
-start "event_relay" powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%event_relay.ps1"
+rem -- Optional: launch event relay (SE + Twitch) in a separate window --
+if /i "%EVENT_RELAY_ENABLED%"=="1" (
+  if exist "%PROJECT_DIR%event_relay.ps1" (
+    start "event_relay" powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%event_relay.ps1"
+  ) else (
+    echo EVENT_RELAY_ENABLED=1 but event_relay.ps1 was not found.
+  )
+) else (
+  echo Event relay auto-start disabled. Set EVENT_RELAY_ENABLED=1 to enable.
+)
 
 "%LUA_CMD%" zibo_failure_bot.lua

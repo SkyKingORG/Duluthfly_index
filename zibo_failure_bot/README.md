@@ -20,7 +20,7 @@ This package creates a lightweight Lua-based bot that can:
 1. Install Lua and add it to your system `PATH`, or define one of these environment variables:
    - `LUA` -> full path to `lua.exe`
    - `LUA_HOME` -> Lua installation folder containing `lua.exe`
-2. Install LuaSocket and dkjson for your Lua runtime.
+2. Install LuaSocket for your Lua runtime.
 3. Place the files in a folder that is easy to run from a local machine.
 4. Edit the configuration block at the top of [zibo_failure_bot.lua](zibo_failure_bot.lua) for:
    - your Twitch bot credentials,
@@ -35,6 +35,10 @@ This package creates a lightweight Lua-based bot that can:
     - `TWITCH_IRC_PORT` (optional)
 5. Start the script with `start_bot.bat`.
 6. Open [dashboard.html](dashboard.html) in a browser.
+
+If `TWITCH_OAUTH` is not set, `start_bot.bat` now starts the bot with Twitch IRC disabled while keeping StreamElements and Streamlabs webhook endpoints enabled.
+
+`start_bot.bat` does not auto-start `event_relay.ps1` unless you opt in with `EVENT_RELAY_ENABLED=1`.
 
 ## Automatic install into X-Plane folders
 

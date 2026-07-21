@@ -1,7 +1,7 @@
 @echo off
 cd /d "%~dp0"
 set "PROJECT_DIR=%~dp0"
-if not defined TWITCH_OAUTH set "TWITCH_OAUTH=oauth:ambcwmt03vrl239ls7hxifcywfh90w"
+if not defined TWITCH_OAUTH set "TWITCH_OAUTH=oauth:wyhoegqqw5bfqh8590x6hhhrnnf86r"
 if not defined TWITCH_OAUTH (
   echo TWITCH_OAUTH is not set.
   echo Set TWITCH_OAUTH in your terminal before running this script.
