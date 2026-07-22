@@ -39,7 +39,7 @@ param(
     [int]$MaxDelaySec = 90,
     [double]$TwitchChance = 0.30,
     [string]$TwitchOAuth = $env:TWITCH_OAUTH,
-    [string]$TwitchNick = $(if ($env:TWITCH_BOT_NICK) { $env:TWITCH_BOT_NICK } else { "OnlyPilots" }),
+    [string]$TwitchNick = $(if ($env:TWITCH_BOT_NICK) { $env:TWITCH_BOT_NICK } else { "desktoppilotsociety" }),
     [string]$TwitchChannel = $(if ($env:TWITCH_CHANNEL) { $env:TWITCH_CHANNEL } else { "#desktoppilotsociety" })
 )
 
@@ -55,7 +55,7 @@ function Write-Log {
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [auto-events] $Message"
 }
 
-function Normalize-TwitchOAuth {
+function ConvertTo-TwitchOAuth {
     param([string]$Token)
 
     if ([string]::IsNullOrWhiteSpace($Token)) {
@@ -110,7 +110,7 @@ function Send-SEEvent {
 function Send-TwitchCommand {
     param([string]$Command)
 
-    $token = Normalize-TwitchOAuth -Token $TwitchOAuth
+    $token = ConvertTo-TwitchOAuth -Token $TwitchOAuth
     if ([string]::IsNullOrWhiteSpace($token)) {
         Write-Log "No TWITCH_OAUTH provided; skipping Twitch command."
         return
@@ -180,7 +180,7 @@ $seEvents = @(
 )
 
 $twitchCommands = @("!fail", "!zibo")
-$twitchEnabled = -not [string]::IsNullOrWhiteSpace((Normalize-TwitchOAuth -Token $TwitchOAuth))
+$twitchEnabled = -not [string]::IsNullOrWhiteSpace((ConvertTo-TwitchOAuth -Token $TwitchOAuth))
 
 Write-Host "=== auto_events started ==="
 Write-Host "Bot health: $botHealthUri"
@@ -202,8 +202,8 @@ while ($true) {
         $command = $twitchCommands[$rng.Next(0, $twitchCommands.Count)]
         Send-TwitchCommand -Command $command
     } else {
-        $event = $seEvents[$rng.Next(0, $seEvents.Count)]
-        Send-SEEvent -Body $event | Out-Null
+        $payloadEntry = $seEvents[$rng.Next(0, $seEvents.Count)]
+        Send-SEEvent -Body $payloadEntry | Out-Null
     }
 
     $delay = $rng.Next($MinDelaySec, $MaxDelaySec + 1)

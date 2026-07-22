@@ -48,7 +48,7 @@ end
 
 local config = {
   twitch = {
-    nick = getenv_nonempty("TWITCH_BOT_NICK", "OnlyPilots"),
+    nick = getenv_nonempty("TWITCH_BOT_NICK", "desktoppilotsociety"),
     oauth = getenv_nonempty("TWITCH_OAUTH", "oauth:replace_with_token"),
     channel = getenv_nonempty("TWITCH_CHANNEL", "#desktoppilotsociety"),
     server = getenv_nonempty("TWITCH_IRC_SERVER", "irc.chat.twitch.tv"),
