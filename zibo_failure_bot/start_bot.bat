@@ -67,7 +67,6 @@ if /i "%LUA_CMD%"=="lua" (
 
 if not defined TWITCH_BOT_NICK set "TWITCH_BOT_NICK=OnlyPilots"
 if not defined TWITCH_CHANNEL set "TWITCH_CHANNEL=#desktoppilotsociety"
-if not defined TWITCH_OAUTH set "TWITCH_OAUTH=oauth:wyhoegqqw5bfqh8590x6hhhrnnf86r"
 
 if not defined TWITCH_OAUTH (
   echo TWITCH_OAUTH is not set. Starting bot with Twitch IRC disabled.

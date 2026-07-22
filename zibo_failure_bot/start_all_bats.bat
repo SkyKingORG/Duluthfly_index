@@ -2,13 +2,12 @@
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
-echo [start-all-bats] Launching all .bat files in "%~dp0"
+echo [start-all-bats] Launching release startup batch files in "%~dp0"
 
-for %%F in ("%~dp0*.bat") do (
-  set "BAT_NAME=%%~nxF"
-  if /I not "!BAT_NAME!"=="start_all_bats.bat" (
-    echo [start-all-bats] Starting !BAT_NAME!
-    start "%%~nF" cmd /c ""%~dp0%%~nxF""
+for %%F in (start_bot.bat start_twitch_bridge.bat start_auto_events.bat) do (
+  if exist "%~dp0%%F" (
+    echo [start-all-bats] Starting %%F
+    start "%%~nF" cmd /c ""%~dp0%%F""
   )
 )
 

@@ -36,16 +36,18 @@ This package creates a lightweight Lua-based bot that can:
 5. Start the script with `start_bot.bat`.
 6. Open [dashboard.html](dashboard.html) in a browser.
 
-If `TWITCH_OAUTH` is not set, `start_bot.bat` now starts the bot with Twitch IRC disabled while keeping StreamElements and Streamlabs webhook endpoints enabled.
+If `TWITCH_OAUTH` is not set, `start_bot.bat` starts the bot with Twitch IRC disabled while keeping StreamElements and Streamlabs webhook endpoints enabled.
 
 `start_bot.bat` does not auto-start `event_relay.ps1` unless you opt in with `EVENT_RELAY_ENABLED=1`.
+
+For release use, do not ship a real Twitch OAuth token inside these scripts. Set `TWITCH_OAUTH` in the runtime environment instead.
 
 ## Automatic install into X-Plane folders
 
 Use the installer to automatically place files into the simulator tree:
 
 - Host-side bot files are copied to `X-Plane 12\\Tools\\ZiboFailureBot`.
-- The FlyWithLua bridge is copied to `X-Plane 12\\Resources\\plugins\\FlyWithLua\\Scripts\\zibo_failure_xplane_bridge.lua`.
+- The xPilot-safe FlyWithLua bridge from [xplane_bridge_xpilot_safe.lua](xplane_bridge_xpilot_safe.lua) is installed into the FlyWithLua `Scripts` folder as the active bridge script.
 
 PowerShell:
 
@@ -59,7 +61,8 @@ Optional preview (no file changes):
 
 - `./install_bot.ps1 -SimulatorRoot "D:\\X-Plane 12" -DryRun`
 
-After install, launch the bot from `Tools\\ZiboFailureBot\\start_bot.bat` and launch Twitch relay from `Tools\\ZiboFailureBot\\start_twitch_bridge.bat`.
+After install, the recommended all-in-one launcher is `Tools\\ZiboFailureBot\\start_live_mode.bat`.
+You can still launch `Tools\\ZiboFailureBot\\start_bot.bat` and `Tools\\ZiboFailureBot\\start_twitch_bridge.bat` separately if you want manual control.
 
 ## Twitch event bridge
 
@@ -92,7 +95,7 @@ Environment variables used by the bridge:
 - `TWITCH_TIP_COMMAND` -> synthetic tip chat command, defaults to `!tip`
 - `TWITCH_STARTBOT_COMMAND` -> remote start command, defaults to `!startbot`
 - `TWITCH_STARTBOT_CHANNEL` -> only this channel may use the start command, defaults to `#desktoppilotsociety`
-- `TWITCH_STARTBOT_SCRIPT` -> local script name to launch, defaults to `start_bot.bat`
+- `TWITCH_STARTBOT_SCRIPT` -> local script name to launch, defaults to `start_live_mode.bat`
 - `TWITCH_CHAT_RESPONSES` -> set to `0` to disable Twitch chat confirmations, defaults to enabled
 
 Example run:
@@ -105,6 +108,7 @@ Recommended startup order:
 
 - start the main local bot with `start_bot.bat`
 - then start the Twitch relay with `start_twitch_bridge.bat`
+- or use `start_live_mode.bat` to launch the bot, StreamElements relay, and Twitch bridge together
 
 Notes:
 

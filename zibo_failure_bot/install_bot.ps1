@@ -40,7 +40,7 @@ function Resolve-ExistingPath {
   return $resolved.ProviderPath
 }
 
-function Ensure-Directory {
+function New-Directory {
   param([string]$Path)
 
   if ($DryRun) {
@@ -58,7 +58,7 @@ function Copy-FileTo {
   )
 
   $destDir = Split-Path -Parent $Destination
-  Ensure-Directory -Path $destDir
+  New-Directory -Path $destDir
 
   if ($DryRun) {
     Write-Step "[dry-run] copy file: $Source -> $Destination"
@@ -74,7 +74,7 @@ function Copy-DirectoryTo {
     [string]$Destination
   )
 
-  Ensure-Directory -Path $Destination
+  New-Directory -Path $Destination
 
   if ($DryRun) {
     Write-Step "[dry-run] copy directory: $Source -> $Destination"
@@ -131,9 +131,17 @@ $bridgeTargetFile = Join-Path $flyWithLuaScriptsRoot "zibo_failure_xplane_bridge
 $hostFiles = @(
   "README.md",
   "dashboard.html",
+  "auto_events.ps1",
+  "event_relay.ps1",
+  "send_events.ps1",
+  "start_all_bats.bat",
+  "start_auto_events.bat",
   "start_bot.bat",
+  "start_live_mode.bat",
   "start_twitch_bridge.bat",
+  "start_twitch_then_bot.lua",
   "twitch_event_bridge.lua",
+  "xplane_bridge_xpilot_safe.lua",
   "zibo_failure_bot.lua",
   "install_bot.ps1",
   "install_bot.bat"
@@ -144,7 +152,7 @@ $optionalDirectories = @(
 )
 
 Write-Step "Installing bot host files into: $hostInstallRoot"
-Ensure-Directory -Path $hostInstallRoot
+New-Directory -Path $hostInstallRoot
 
 foreach ($fileName in $hostFiles) {
   $sourcePath = Join-Path $resolvedSourceRoot $fileName
@@ -167,7 +175,7 @@ foreach ($dirName in $optionalDirectories) {
 }
 
 Write-Step "Installing X-Plane bridge into: $bridgeTargetFile"
-$bridgeSourcePath = Join-Path $resolvedSourceRoot "xplane_bridge.lua"
+$bridgeSourcePath = Join-Path $resolvedSourceRoot "xplane_bridge_xpilot_safe.lua"
 if (-not (Test-Path -LiteralPath $bridgeSourcePath)) {
   throw "Required bridge script missing: $bridgeSourcePath"
 }
@@ -177,4 +185,4 @@ Copy-FileTo -Source $bridgeSourcePath -Destination $bridgeTargetFile
 Write-Step "Install complete."
 Write-Step "Host bot folder: $hostInstallRoot"
 Write-Step "FlyWithLua bridge: $bridgeTargetFile"
-Write-Step "Run start_bot.bat from the host bot folder and keep X-Plane running with FlyWithLua enabled."
+Write-Step "Recommended launcher: start_live_mode.bat from the host bot folder. Keep X-Plane running with FlyWithLua enabled."
