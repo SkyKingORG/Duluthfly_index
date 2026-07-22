@@ -419,6 +419,7 @@ local config = {
     channel = getenv_nonempty("TWITCH_CHANNEL", "#desktoppilotsociety"),
     server = getenv_nonempty("TWITCH_IRC_SERVER", "irc.chat.twitch.tv"),
     port = tonumber(getenv_nonempty("TWITCH_IRC_PORT", "6667")) or 6667,
+    endpoint = "/twitch",
   },
   streamelements = {
     enabled = getenv_nonempty("STREAMELEMENTS_ENABLED", "true") ~= "false",
@@ -819,6 +820,41 @@ local function handle_streamelements_payload(payload)
   end
 end
 
+local function handle_twitch_bridge_payload(payload)
+  if not payload then return end
+
+  local event_name = nil
+  local amount = 1
+  local details = { source = "twitch_bridge", user = payload_user(payload) }
+
+  if payload.type == "follow" or payload.type == "follower" or payload.event == "follow" or payload.event == "follower" then
+    record_follower(payload_user(payload))
+    return
+  end
+
+  if payload.type == "tip" or payload.event == "tip" then
+    event_name = "tip"
+    amount = coerce_number(payload.amount or payload.data and payload.data.amount or 1, 1)
+  elseif payload.type == "subscription" or payload.type == "subscriber" or payload.event == "subscription" then
+    event_name = "subscribe"
+    amount = coerce_number(payload.amount or payload.months or 1, 1)
+    details.subscription_kind = is_prime_subscription(payload) and "prime" or tostring(payload.subscription_kind or "regular")
+  elseif payload.type == "raid" or payload.event == "raid" then
+    event_name = "raid"
+    amount = coerce_number(payload.viewers or payload.viewer_count or 1, 1)
+  elseif payload.type == "gifted" or payload.event == "gifted" or payload.type == "gift_sub" then
+    event_name = "gift"
+    amount = coerce_number(payload.amount or payload.count or payload.gifts or 1, 1)
+  elseif payload.type == "bits" or payload.event == "bits" then
+    event_name = "bits"
+    amount = coerce_number(payload.bits or payload.amount or 1, 1)
+  end
+
+  if event_name then
+    apply_event(event_name, amount, details)
+  end
+end
+
 local function handle_http_request(client)
   local request_line = client:receive("*l")
   if not request_line then return end
@@ -854,6 +890,8 @@ local function handle_http_request(client)
     handle_streamlabs_payload(payload)
   elseif path == config.streamelements.endpoint then
     handle_streamelements_payload(payload)
+  elseif path == config.twitch.endpoint then
+    handle_twitch_bridge_payload(payload)
   elseif path == "/admin/reset" then
     if not is_local_client then
       local forbidden = json.encode({ status = "forbidden" })
@@ -993,7 +1031,7 @@ local function main()
   end
   server:settimeout(0.1)
   print(string.format("[http] listening on port %d", config.listen_port))
-  print("[bot] ready. Send events to /streamlabs or /streamelements, or use Twitch chat commands if enabled.")
+  print("[bot] ready. Send events to /streamlabs, /streamelements, or /twitch, or use Twitch chat commands if enabled.")
   show_status_message("Bot Started", "Zibo Failure Bot started and is listening on port " .. tostring(config.listen_port) .. ".", false)
 
   while true do

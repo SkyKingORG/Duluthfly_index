@@ -57,7 +57,7 @@ local config = {
   bot = {
     host = getenv_nonempty("FAILURE_BOT_HOST", "127.0.0.1"),
     port = tonumber(getenv_nonempty("FAILURE_BOT_PORT", "6100")) or 6100,
-    endpoint = getenv_nonempty("FAILURE_BOT_ENDPOINT", "/streamelements"),
+    endpoint = getenv_nonempty("FAILURE_BOT_ENDPOINT", "/twitch"),
   },
   synthetic_tip_command = getenv_nonempty("TWITCH_TIP_COMMAND", "!tip"),
   start_bot_command = getenv_nonempty("TWITCH_STARTBOT_COMMAND", "!startbot"),

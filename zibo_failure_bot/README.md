@@ -119,7 +119,7 @@ Environment variables used by the bridge:
 - `TWITCH_IRC_PORT` -> optional, defaults to `6667`
 - `FAILURE_BOT_HOST` -> local failure bot host, defaults to `127.0.0.1`
 - `FAILURE_BOT_PORT` -> local failure bot port, defaults to `6100`
-- `FAILURE_BOT_ENDPOINT` -> local bot endpoint, defaults to `/streamelements`
+- `FAILURE_BOT_ENDPOINT` -> local bot endpoint, defaults to `/twitch`
 - `TWITCH_TIP_COMMAND` -> synthetic tip chat command, defaults to `!tip`
 - `TWITCH_STARTBOT_COMMAND` -> remote start command, defaults to `!startbot`
 - `TWITCH_RESETBOT_COMMAND` -> remote reset command, defaults to `!resetbot`
@@ -268,6 +268,7 @@ Set your webhook endpoint to:
 
 - StreamElements: http://your-host:6100/streamelements
 - Streamlabs: http://your-host:6100/streamlabs
+- Twitch bridge forward path: http://your-host:6100/twitch
 
 The bot expects a JSON body. The parser handles common event shapes for:
 
