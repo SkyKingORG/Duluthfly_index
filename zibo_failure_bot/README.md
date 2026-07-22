@@ -38,28 +38,50 @@ This package creates a lightweight Lua-based bot that can:
 
 If `TWITCH_OAUTH` is not set, `start_bot.bat` starts the bot with Twitch IRC disabled while keeping StreamElements and Streamlabs webhook endpoints enabled.
 
-`start_bot.bat` does not auto-start `event_relay.ps1` unless you opt in with `EVENT_RELAY_ENABLED=1`.
+`start_bot.bat` now does a clean startup sequence automatically:
+
+- stops previous bot operations,
+- resets bot state to zero faults/events,
+- starts the Twitch bridge,
+- starts the automatic event generator,
+- starts the main Lua bot.
+
+You can skip helper process startup when needed:
+
+- set `SKIP_TWITCH_BRIDGE=1` to skip starting `start_twitch_bridge.bat`
+- set `SKIP_AUTO_EVENTS=1` to skip starting `start_auto_events.bat`
 
 For release use, do not ship a real Twitch OAuth token inside these scripts. Set `TWITCH_OAUTH` in the runtime environment instead.
+
+You can generate a Twitch OAuth token at https://antiscuff.com/oauth/ and then set it as `TWITCH_OAUTH`.
 
 ## Automatic install into X-Plane folders
 
 Use the installer to automatically place files into the simulator tree:
 
 - Host-side bot files are copied to `X-Plane 12\\Tools\\ZiboFailureBot`.
-- The xPilot-safe FlyWithLua bridge from [xplane_bridge_xpilot_safe.lua](xplane_bridge_xpilot_safe.lua) is installed into the FlyWithLua `Scripts` folder as the active bridge script.
+- The real-time FlyWithLua bridge from [xplane_bridge_realtime.lua](xplane_bridge_realtime.lua) is installed into the FlyWithLua `Scripts` folder as the active bridge script.
 
 PowerShell:
 
 - `./install_bot.ps1 -SimulatorRoot "D:\\X-Plane 12"`
+- `./install_bot.ps1 -SimulatorRoot "D:\\X-Plane 12" -BridgeProfile realtime`
+- `./install_bot.ps1 -SimulatorRoot "D:\\X-Plane 12" -BridgeProfile xpilot_safe`
 
 Command Prompt:
 
 - `install_bot.bat "D:\\X-Plane 12"`
+- `install_bot.bat "D:\\X-Plane 12" realtime`
+- `install_bot.bat "D:\\X-Plane 12" xpilot_safe`
 
 Optional preview (no file changes):
 
 - `./install_bot.ps1 -SimulatorRoot "D:\\X-Plane 12" -DryRun`
+
+Bridge profile options:
+
+- `realtime` (default) -> installs [xplane_bridge_realtime.lua](xplane_bridge_realtime.lua) as the active FlyWithLua bridge
+- `xpilot_safe` -> installs [xplane_bridge_xpilot_safe.lua](xplane_bridge_xpilot_safe.lua) as the active FlyWithLua bridge
 
 After install, the recommended all-in-one launcher is `Tools\\ZiboFailureBot\\start_live_mode.bat`.
 You can still launch `Tools\\ZiboFailureBot\\start_bot.bat` and `Tools\\ZiboFailureBot\\start_twitch_bridge.bat` separately if you want manual control.
@@ -78,7 +100,13 @@ What it forwards into the bot:
 - gifted subs / community gift bombs,
 - synthetic tip events using a chat command.
 
-It can also launch the local bot process from Twitch chat with `!startbot`.
+It can also control local bot lifecycle from Twitch chat for moderators/broadcaster:
+
+- `!startbot` -> starts the local bot process
+- `!resetbot` -> resets the bot back to 0 faults and 0 events
+- `!stopbot` -> stops all local bot operations
+
+By default, these commands are only accepted in `TWITCH_STARTBOT_CHANNEL`.
 When a viewer-triggered Twitch event is forwarded successfully, the bridge also posts a confirmation message back into Twitch chat.
 
 Environment variables used by the bridge:
@@ -94,8 +122,11 @@ Environment variables used by the bridge:
 - `FAILURE_BOT_ENDPOINT` -> local bot endpoint, defaults to `/streamelements`
 - `TWITCH_TIP_COMMAND` -> synthetic tip chat command, defaults to `!tip`
 - `TWITCH_STARTBOT_COMMAND` -> remote start command, defaults to `!startbot`
+- `TWITCH_RESETBOT_COMMAND` -> remote reset command, defaults to `!resetbot`
+- `TWITCH_STOPBOT_COMMAND` -> remote stop command, defaults to `!stopbot`
 - `TWITCH_STARTBOT_CHANNEL` -> only this channel may use the start command, defaults to `#desktoppilotsociety`
-- `TWITCH_STARTBOT_SCRIPT` -> local script name to launch, defaults to `start_live_mode.bat`
+- `TWITCH_STARTBOT_SCRIPT` -> local script name to launch, defaults to `start_bot.bat`
+- `TWITCH_STOPBOT_SCRIPT` -> local stop script name, defaults to `stop_bot_operations.ps1`
 - `TWITCH_CHAT_RESPONSES` -> set to `0` to disable Twitch chat confirmations, defaults to enabled
 
 Example run:
@@ -108,15 +139,109 @@ Recommended startup order:
 
 - start the main local bot with `start_bot.bat`
 - then start the Twitch relay with `start_twitch_bridge.bat`
-- or use `start_live_mode.bat` to launch the bot, StreamElements relay, and Twitch bridge together
+- or use `start_live_mode.bat` to launch the bot, auto-event generator, and Twitch bridge together
 
 Notes:
 
 - Twitch IRC does not provide native donation / tip events. The bridge supports a synthetic tip command like `!tip 5` so chat automation can still trigger the bot's tip failure path.
 - The bridge reuses the existing local bot HTTP endpoint so you do not need to change [zibo_failure_bot.lua](zibo_failure_bot.lua) to receive these Twitch event types.
-- `!startbot` is restricted to moderators/broadcaster and only works in `#desktoppilotsociety` by default.
+- `!startbot`, `!resetbot`, and `!stopbot` are restricted to moderators/broadcaster and only work in `#desktoppilotsociety` by default.
 - Successful viewer-triggered Twitch actions send a chat acknowledgement so the channel can see that the event reached the bot.
 - `start_twitch_bridge.bat` does not contain a fallback OAuth token. Set `TWITCH_OAUTH` in your environment before launch.
+
+## Reset and stop scripts
+
+Local helper scripts now included:
+
+- `reset_bot_state.ps1` -> writes a zeroed `dashboard_state.json` and attempts a live `/admin/reset` call.
+- `stop_bot_operations.ps1` -> stops all bot-related local processes (bot, Twitch bridge, auto events).
+
+The bot also exposes local-only admin endpoints used by the bridge/scripts:
+
+- `POST /admin/reset` -> reset live bot state to zero
+- `POST /admin/stop` -> stop the running bot loop
+
+These admin endpoints only accept localhost callers.
+
+## Quick ops (PowerShell)
+
+Run from the project folder:
+
+```powershell
+Set-Location "C:\Users\scott\Documents\Duluthfly_index\zibo_failure_bot"
+```
+
+Start full suite (bot + Twitch bridge + auto-events):
+
+```powershell
+.\start_bot.bat
+```
+
+Start bot only (skip bridge and auto-events):
+
+```powershell
+$env:SKIP_TWITCH_BRIDGE = "1"
+$env:SKIP_AUTO_EVENTS = "1"
+.\start_bot.bat
+```
+
+Reset live bot to 0 faults / 0 events:
+
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:6100/admin/reset" -Method Post -ContentType "application/json" -Body "{}"
+```
+
+Stop all bot operations:
+
+```powershell
+.\stop_bot_operations.ps1
+```
+
+Health check:
+
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:6100/health" -Method Get
+```
+
+## Quick ops (Command Prompt)
+
+Run from the project folder:
+
+```bat
+cd /d C:\Users\scott\Documents\Duluthfly_index\zibo_failure_bot
+```
+
+Start full suite (bot + Twitch bridge + auto-events):
+
+```bat
+start_bot.bat
+```
+
+Start bot only (skip bridge and auto-events):
+
+```bat
+set SKIP_TWITCH_BRIDGE=1
+set SKIP_AUTO_EVENTS=1
+start_bot.bat
+```
+
+Reset live bot to 0 faults / 0 events:
+
+```bat
+powershell -NoProfile -Command "Invoke-RestMethod -Uri 'http://127.0.0.1:6100/admin/reset' -Method Post -ContentType 'application/json' -Body '{}'"
+```
+
+Stop all bot operations:
+
+```bat
+powershell -NoProfile -ExecutionPolicy Bypass -File .\stop_bot_operations.ps1
+```
+
+Health check:
+
+```bat
+powershell -NoProfile -Command "Invoke-RestMethod -Uri 'http://127.0.0.1:6100/health' -Method Get"
+```
 
 ### Windows environment example
 

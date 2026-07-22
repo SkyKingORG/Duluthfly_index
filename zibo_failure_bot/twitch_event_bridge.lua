@@ -61,8 +61,11 @@ local config = {
   },
   synthetic_tip_command = getenv_nonempty("TWITCH_TIP_COMMAND", "!tip"),
   start_bot_command = getenv_nonempty("TWITCH_STARTBOT_COMMAND", "!startbot"),
+  reset_bot_command = getenv_nonempty("TWITCH_RESETBOT_COMMAND", "!resetbot"),
+  stop_bot_command = getenv_nonempty("TWITCH_STOPBOT_COMMAND", "!stopbot"),
   start_bot_channel = getenv_nonempty("TWITCH_STARTBOT_CHANNEL", "#desktoppilotsociety"):lower(),
-  start_bot_script = getenv_nonempty("TWITCH_STARTBOT_SCRIPT", "start_live_mode.bat"),
+  start_bot_script = getenv_nonempty("TWITCH_STARTBOT_SCRIPT", "start_bot.bat"),
+  stop_bot_script = getenv_nonempty("TWITCH_STOPBOT_SCRIPT", "stop_bot_operations.ps1"),
   chat_responses_enabled = getenv_nonempty("TWITCH_CHAT_RESPONSES", "1") ~= "0",
   reconnect_delay_seconds = tonumber(getenv_nonempty("TWITCH_RECONNECT_DELAY", "5")) or 5,
 }
@@ -333,7 +336,7 @@ local function forward_event(client, payload)
   end
 end
 
-local function can_start_bot(tags)
+local function can_manage_bot(tags)
   local mod_flag = tostring(tags.mod or "")
   if mod_flag == "1" then
     return true
@@ -351,7 +354,7 @@ local function launch_local_bot()
   local script_dir = get_script_dir()
   local script_path = script_dir .. config.start_bot_script
   local quoted_script = string.format('"%s"', script_path)
-  local launch_cmd = string.format('start "" /D "%s" cmd /c %s', script_dir:gsub('[\\/]$', ''), quoted_script)
+  local launch_cmd = string.format('start "" /D "%s" cmd /c "set SKIP_TWITCH_BRIDGE=1 && %s"', script_dir:gsub('[\\/]$', ''), quoted_script)
 
   local ok = os.execute(launch_cmd)
   if ok == true or ok == 0 then
@@ -360,6 +363,59 @@ local function launch_local_bot()
   end
 
   log("failed to launch local bot using " .. config.start_bot_script)
+  return false
+end
+
+local function call_local_admin(path)
+  local request = table.concat({
+    "POST " .. tostring(path) .. " HTTP/1.1",
+    "Host: " .. config.bot.host .. ":" .. tostring(config.bot.port),
+    "Content-Type: application/json",
+    "Connection: close",
+    "Content-Length: 2",
+    "",
+    "{}",
+  }, "\r\n")
+
+  local client, err = socket.tcp()
+  if not client then
+    log("failed to create admin HTTP client: " .. tostring(err))
+    return false
+  end
+
+  client:settimeout(3)
+  local ok, connect_err = client:connect(config.bot.host, config.bot.port)
+  if not ok then
+    client:close()
+    log("admin request connect failed: " .. tostring(connect_err))
+    return false
+  end
+
+  local send_ok, send_err = client:send(request)
+  if not send_ok then
+    client:close()
+    log("admin request send failed: " .. tostring(send_err))
+    return false
+  end
+
+  local status_line = client:receive("*l")
+  client:close()
+  return status_line ~= nil and status_line:find(" 200 ", 1, true) ~= nil
+end
+
+local function stop_all_local_operations()
+  local script_dir = get_script_dir()
+  local script_path = script_dir .. config.stop_bot_script
+  local quoted_script = string.format('"%s"', script_path)
+  local launch_cmd = string.format('start "" /MIN powershell -NoProfile -ExecutionPolicy Bypass -File %s -Quiet', quoted_script)
+  local ok = os.execute(launch_cmd)
+
+  if ok == true or ok == 0 then
+    log("launched stop operation script: " .. config.stop_bot_script)
+    return true
+  end
+
+  log("failed to launch stop operation script: " .. config.stop_bot_script)
   return false
 end
 
@@ -425,14 +481,56 @@ local function handle_privmsg(client, parsed)
   local channel = tostring(parsed.params and parsed.params[2] or ""):lower()
 
   local normalized = trim(message):lower()
+  local is_admin_command_channel = (channel == config.start_bot_channel)
+
+  if normalized == config.reset_bot_command:lower() then
+    if not is_admin_command_channel then
+      log("ignored !resetbot outside allowed channel: " .. tostring(channel))
+      send_chat_message(client, "!resetbot is only enabled in " .. config.start_bot_channel .. ".")
+      return
+    end
+
+    if not can_manage_bot(tags) then
+      log("blocked !resetbot from non-mod user: " .. tostring(user))
+      send_chat_message(client, user .. ", only the broadcaster or a moderator can use !resetbot.")
+      return
+    end
+
+    local reset_ok = call_local_admin("/admin/reset")
+    if reset_ok then
+      send_chat_message(client, "Bot reset accepted. Faults and event counters are now back to zero.")
+    else
+      send_chat_message(client, "Bot reset failed. Check bot and bridge logs.")
+    end
+    return
+  end
+
+  if normalized == config.stop_bot_command:lower() then
+    if not is_admin_command_channel then
+      log("ignored !stopbot outside allowed channel: " .. tostring(channel))
+      send_chat_message(client, "!stopbot is only enabled in " .. config.start_bot_channel .. ".")
+      return
+    end
+
+    if not can_manage_bot(tags) then
+      log("blocked !stopbot from non-mod user: " .. tostring(user))
+      send_chat_message(client, user .. ", only the broadcaster or a moderator can use !stopbot.")
+      return
+    end
+
+    send_chat_message(client, "Stop command accepted. Stopping all local bot operations.")
+    stop_all_local_operations()
+    return
+  end
+
   if normalized == config.start_bot_command:lower() then
-    if channel ~= config.start_bot_channel then
+    if not is_admin_command_channel then
       log("ignored !startbot outside allowed channel: " .. tostring(channel))
       send_chat_message(client, "!startbot is only enabled in " .. config.start_bot_channel .. ".")
       return
     end
 
-    if not can_start_bot(tags) then
+    if not can_manage_bot(tags) then
       log("blocked !startbot from non-mod user: " .. tostring(user))
       send_chat_message(client, user .. ", only the broadcaster or a moderator can use !startbot.")
       return

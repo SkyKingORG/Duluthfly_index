@@ -9,6 +9,10 @@ param(
   [Parameter(Mandatory = $false)]
   [string]$BotFolderName = "ZiboFailureBot",
 
+  [Parameter(Mandatory = $false)]
+  [ValidateSet("realtime", "xpilot_safe")]
+  [string]$BridgeProfile = "realtime",
+
   [switch]$DryRun
 )
 
@@ -133,14 +137,17 @@ $hostFiles = @(
   "dashboard.html",
   "auto_events.ps1",
   "event_relay.ps1",
+  "reset_bot_state.ps1",
   "send_events.ps1",
   "start_all_bats.bat",
   "start_auto_events.bat",
   "start_bot.bat",
   "start_live_mode.bat",
+  "stop_bot_operations.ps1",
   "start_twitch_bridge.bat",
   "start_twitch_then_bot.lua",
   "twitch_event_bridge.lua",
+  "xplane_bridge_realtime.lua",
   "xplane_bridge_xpilot_safe.lua",
   "zibo_failure_bot.lua",
   "install_bot.ps1",
@@ -175,7 +182,12 @@ foreach ($dirName in $optionalDirectories) {
 }
 
 Write-Step "Installing X-Plane bridge into: $bridgeTargetFile"
-$bridgeSourcePath = Join-Path $resolvedSourceRoot "xplane_bridge_xpilot_safe.lua"
+if ($BridgeProfile -eq "xpilot_safe") {
+  $bridgeSourcePath = Join-Path $resolvedSourceRoot "xplane_bridge_xpilot_safe.lua"
+} else {
+  $bridgeSourcePath = Join-Path $resolvedSourceRoot "xplane_bridge_realtime.lua"
+}
+
 if (-not (Test-Path -LiteralPath $bridgeSourcePath)) {
   throw "Required bridge script missing: $bridgeSourcePath"
 }
@@ -185,4 +197,5 @@ Copy-FileTo -Source $bridgeSourcePath -Destination $bridgeTargetFile
 Write-Step "Install complete."
 Write-Step "Host bot folder: $hostInstallRoot"
 Write-Step "FlyWithLua bridge: $bridgeTargetFile"
+Write-Step "Bridge profile: $BridgeProfile"
 Write-Step "Recommended launcher: start_live_mode.bat from the host bot folder. Keep X-Plane running with FlyWithLua enabled."

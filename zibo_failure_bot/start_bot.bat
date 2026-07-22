@@ -67,6 +67,7 @@ if /i "%LUA_CMD%"=="lua" (
 
 if not defined TWITCH_BOT_NICK set "TWITCH_BOT_NICK=OnlyPilots"
 if not defined TWITCH_CHANNEL set "TWITCH_CHANNEL=#desktoppilotsociety"
+if not defined TWITCH_OAUTH set "TWITCH_OAUTH=oauth:8gy2b00ynzq8wgfjmn3vvsy0c7usbj"
 
 if not defined TWITCH_OAUTH (
   echo TWITCH_OAUTH is not set. Starting bot with Twitch IRC disabled.
@@ -82,15 +83,28 @@ rem -- Keep webhook integrations enabled by default --
 set "STREAMELEMENTS_ENABLED=true"
 set "STREAMLABS_ENABLED=true"
 
-rem -- Optional: launch event relay (SE + Twitch) in a separate window --
-if /i "%EVENT_RELAY_ENABLED%"=="1" (
-  if exist "%PROJECT_DIR%event_relay.ps1" (
-    start "event_relay" powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%event_relay.ps1"
-  ) else (
-    echo EVENT_RELAY_ENABLED=1 but event_relay.ps1 was not found.
-  )
+if exist "%PROJECT_DIR%stop_bot_operations.ps1" (
+  echo Stopping previous bot operations...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%stop_bot_operations.ps1" -Quiet
+)
+
+if exist "%PROJECT_DIR%reset_bot_state.ps1" (
+  echo Resetting bot state to zero...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%reset_bot_state.ps1" -BotHost 127.0.0.1 -BotPort 6100 -StatePath "%PROJECT_DIR%dashboard_state.json"
+)
+
+if /i not "%SKIP_TWITCH_BRIDGE%"=="1" (
+  echo Starting Twitch bridge...
+  start "twitch_bridge" cmd /c ""%PROJECT_DIR%start_twitch_bridge.bat""
 ) else (
-  echo Event relay auto-start disabled. Set EVENT_RELAY_ENABLED=1 to enable.
+  echo Skipping Twitch bridge startup because SKIP_TWITCH_BRIDGE=1
+)
+
+if /i not "%SKIP_AUTO_EVENTS%"=="1" (
+  echo Starting automatic event generator...
+  start "auto_events" cmd /c ""%PROJECT_DIR%start_auto_events.bat""
+) else (
+  echo Skipping automatic event generator because SKIP_AUTO_EVENTS=1
 )
 
 "%LUA_CMD%" zibo_failure_bot.lua

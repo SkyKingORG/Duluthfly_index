@@ -423,6 +423,8 @@ local config = {
   streamelements = {
     enabled = getenv_nonempty("STREAMELEMENTS_ENABLED", "true") ~= "false",
     endpoint = "/streamelements",
+    randomize_all_actions = getenv_nonempty("STREAMELEMENTS_RANDOMIZE_ALL_ACTIONS", "true") ~= "false",
+    prime_sub_failure_burst = tonumber(getenv_nonempty("STREAMELEMENTS_PRIME_SUB_FAILURE_BURST", "3")) or 3,
   },
   streamlabs = {
     enabled = getenv_nonempty("STREAMLABS_ENABLED", "true") ~= "false",
@@ -448,39 +450,44 @@ local config = {
   }
 }
 
-local state = {
-  current_severity = 0.0,
-  last_event = "idle",
-  event_counter = 0,
-  active_failures = {},
-  last_failure_ts = 0,
-  last_raid = {
-    user = "None",
-    viewers = 0,
-    ts = 0,
-  },
-  last_follower = {
-    user = "None",
-    ts = 0,
-  },
-  last_bits = {
-    user = "None",
-    amount = 0,
-    ts = 0,
-  },
-  total_bits = 0,
-  bits_totals = {},
-  top_bits_giver = {
-    user = "None",
-    amount = 0,
-    ts = 0,
-  },
-  highest_single_bits = {
-    user = "None",
-    amount = 0,
-    ts = 0,
-  },
-}
+local function make_initial_state()
+  return {
+    current_severity = 0.0,
+    last_event = "idle",
+    event_counter = 0,
+    active_failures = {},
+    last_failure_ts = 0,
+    last_raid = {
+      user = "None",
+      viewers = 0,
+      ts = 0,
+    },
+    last_follower = {
+      user = "None",
+      ts = 0,
+    },
+    last_bits = {
+      user = "None",
+      amount = 0,
+      ts = 0,
+    },
+    total_bits = 0,
+    bits_totals = {},
+    top_bits_giver = {
+      user = "None",
+      amount = 0,
+      ts = 0,
+    },
+    highest_single_bits = {
+      user = "None",
+      amount = 0,
+      ts = 0,
+    },
+  }
+end
+
+local state = make_initial_state()
+local shutdown_requested = false
 
 local function clamp(value, min, max)
   if value < min then return min end
@@ -499,8 +506,55 @@ local function coerce_number(value, fallback)
   return fallback or 1
 end
 
-local function pick_failure(event_name, amount)
+local function random_failure_name()
+  local names = {}
+  for name, _ in pairs(config.failure_profile) do
+    names[#names + 1] = name
+  end
+
+  if #names == 0 then
+    return "engine"
+  end
+
+  return names[math.random(#names)]
+end
+
+local function is_prime_subscription(payload)
+  if type(payload) ~= "table" then
+    return false
+  end
+
+  local data = type(payload.data) == "table" and payload.data or nil
+  local candidates = {
+    payload.tier,
+    payload.plan,
+    payload.sub_plan,
+    payload.subscription_kind,
+    payload["msg-param-sub-plan"],
+    data and data.tier,
+    data and data.plan,
+    data and data.sub_plan,
+    data and data.subscription_kind,
+  }
+
+  for _, candidate in ipairs(candidates) do
+    local text = tostring(candidate or ""):lower()
+    if text == "prime" or text:find("prime", 1, true) then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function pick_failure(event_name, amount, details)
   local profile = config.failure_profile
+  if details and details.randomize_failure then
+    local failure_name = random_failure_name()
+    local profile_data = profile[failure_name] or profile.engine
+    return failure_name, (profile_data and profile_data.severity or 0.30) + amount * 0.01
+  end
+
   if event_name == "raid" then
     return "engine", profile.engine.severity + amount * 0.01
   elseif event_name == "subscribe" then
@@ -547,6 +601,12 @@ local function write_dashboard_state()
   end
 end
 
+local function reset_state(reason)
+  state = make_initial_state()
+  write_dashboard_state()
+  print(string.format("[state] reset to zero (%s)", tostring(reason or "manual")))
+end
+
 local function send_to_xplane(event_name, failure_name, severity, details)
   if not config.zibo.enabled then return end
 
@@ -573,7 +633,7 @@ end
 local function apply_event(event_name, amount, details)
   amount = coerce_number(amount, 1)
   local severity_boost = config.weights[event_name] or 0.10
-  local failure_name, base_severity = pick_failure(event_name, amount)
+  local failure_name, base_severity = pick_failure(event_name, amount, details)
   local severity = clamp(state.current_severity + (severity_boost * amount) + base_severity, 0, 1.0)
   local now_ts = os.time()
 
@@ -710,7 +770,7 @@ local function handle_streamelements_payload(payload)
   if not payload then return end
   local event_name = nil
   local amount = 1
-  local details = {}
+  local details = { source = "streamelements", user = payload_user(payload), randomize_failure = true }
 
   if payload.type == "follow" or payload.type == "follower" or payload.event == "follow" or payload.event == "follower" or payload.action == "follow" then
     record_follower(payload_user(payload))
@@ -720,26 +780,43 @@ local function handle_streamelements_payload(payload)
   if payload.type == "tip" or payload.event == "tip" or payload.action == "tip" then
     event_name = "tip"
     amount = coerce_number(payload.amount or payload.data and payload.data.amount or 1, 1)
-    details = { source = "streamelements", user = payload_user(payload) }
   elseif payload.type == "subscriber" or payload.type == "subscription" or payload.event == "subscription" then
     event_name = "subscribe"
     amount = coerce_number(payload.amount or payload.months or 1, 1)
-    details = { source = "streamelements", user = payload_user(payload) }
+    details.subscription_kind = is_prime_subscription(payload) and "prime" or "regular"
   elseif payload.type == "raid" or payload.event == "raid" then
     event_name = "raid"
     amount = coerce_number(payload.viewers or payload.viewer_count or 1, 1)
-    details = { source = "streamelements", user = payload_user(payload) }
   elseif payload.type == "gifted" or payload.event == "gifted" or payload.type == "gift_sub" then
     event_name = "gift"
     amount = coerce_number(payload.amount or payload.count or payload.gifts or 1, 1)
-    details = { source = "streamelements", user = payload_user(payload) }
   elseif payload.type == "bits" or payload.event == "bits" then
     event_name = "bits"
     amount = coerce_number(payload.bits or payload.amount or 1, 1)
-    details = { source = "streamelements", user = payload_user(payload) }
+  elseif config.streamelements.randomize_all_actions then
+    event_name = "command"
+    amount = 1
+    details.action_name = tostring(payload.action or payload.type or payload.event or "unknown")
   end
 
-  if event_name then apply_event(event_name, amount, details) end
+  if event_name then
+    apply_event(event_name, amount, details)
+
+    if event_name == "subscribe" and details.subscription_kind == "prime" then
+      local burst = math.max(2, math.floor(config.streamelements.prime_sub_failure_burst + 0.5))
+      for _ = 2, burst do
+        apply_event("subscribe", 1, {
+          source = "streamelements",
+          user = details.user,
+          randomize_failure = true,
+          subscription_kind = "prime",
+          prime_chain = true,
+        })
+      end
+
+      print(string.format("[event] prime sub burst applied: %d immediate failures", burst))
+    end
+  end
 end
 
 local function handle_http_request(client)
@@ -754,7 +831,13 @@ local function handle_http_request(client)
     if key then headers[key:lower()] = value end
   end
 
-  local path = request_line:match("^%w+%s+([^%s]+)") or "/"
+  local method, path = request_line:match("^(%u+)%s+([^%s]+)")
+  method = method or "GET"
+  path = path or "/"
+  path = path:match("^[^?]+") or path
+
+  local peer_ip = select(1, client:getpeername()) or ""
+  local is_local_client = (peer_ip == "127.0.0.1" or peer_ip == "::1" or peer_ip == "::ffff:127.0.0.1")
   local body = ""
   local length = tonumber(headers["content-length"]) or 0
   if length > 0 then
@@ -771,6 +854,28 @@ local function handle_http_request(client)
     handle_streamlabs_payload(payload)
   elseif path == config.streamelements.endpoint then
     handle_streamelements_payload(payload)
+  elseif path == "/admin/reset" then
+    if not is_local_client then
+      local forbidden = json.encode({ status = "forbidden" })
+      client:send("HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: " .. #forbidden .. "\r\n\r\n" .. forbidden)
+      return
+    end
+
+    reset_state("http_admin")
+    local response = json.encode({ status = "ok", action = "reset", method = method })
+    client:send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " .. #response .. "\r\n\r\n" .. response)
+    return
+  elseif path == "/admin/stop" then
+    if not is_local_client then
+      local forbidden = json.encode({ status = "forbidden" })
+      client:send("HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: " .. #forbidden .. "\r\n\r\n" .. forbidden)
+      return
+    end
+
+    shutdown_requested = true
+    local response = json.encode({ status = "ok", action = "stop", method = method })
+    client:send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " .. #response .. "\r\n\r\n" .. response)
+    return
   elseif path == "/health" then
     local health = { status = "ok", current_severity = round(state.current_severity, 2), last_event = state.last_event }
     local body_out = json.encode(health)
@@ -863,6 +968,8 @@ local function handle_twitch_messages(client)
 end
 
 local function main()
+  math.randomseed(os.time())
+
   -- This bot script is intended to run as a standalone Lua process.
   -- In FlyWithLua, use xplane_bridge.lua and keep this script external.
   if type(do_every_frame) == "function" then
@@ -871,7 +978,7 @@ local function main()
     return
   end
 
-  write_dashboard_state()
+  reset_state("startup")
 
   local twitch_client = nil
   if config.twitch.enabled then
@@ -890,6 +997,11 @@ local function main()
   show_status_message("Bot Started", "Zibo Failure Bot started and is listening on port " .. tostring(config.listen_port) .. ".", false)
 
   while true do
+    if shutdown_requested then
+      print("[bot] shutdown requested")
+      break
+    end
+
     local ready_list = {}
     if server then table.insert(ready_list, server) end
     if twitch_client then table.insert(ready_list, twitch_client) end
@@ -913,6 +1025,15 @@ local function main()
       end
     end
   end
+
+  if twitch_client then
+    pcall(function() twitch_client:close() end)
+  end
+  if server then
+    pcall(function() server:close() end)
+  end
+
+  print("[bot] stopped")
 end
 
 main()
